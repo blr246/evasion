@@ -15,8 +15,9 @@ State::MotionInfo::MotionInfo(const Position& s_, const Direction& d_)
 State::State()
   : simTime(0),
     motionP(Position(PInitialPosition::X, PInitialPosition::Y), Direction(0, 0)),
-    motionH(Position(HInitialPosition::X, HInitialPosition::Y), Direction(0, 0)),
+    motionH(Position(HInitialPosition::X, HInitialPosition::Y), Direction(1, 1)),
     walls(),
+    board(Vector2<int>(0, 0), Vector2<int>(BoardSizeX, BoardSizeY)),
     wallCreatePeriod(0),
     maxWalls(0)
 {}
