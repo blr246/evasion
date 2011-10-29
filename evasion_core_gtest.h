@@ -7,7 +7,7 @@ namespace _hps_evasion_evasion_core_gtest_h_
 {
 using namespace hps;
 
-TEST(CoreObject, evasion_core)
+TEST(evasion_core, CoreObject)
 {
   {
     SCOPED_TRACE("State");

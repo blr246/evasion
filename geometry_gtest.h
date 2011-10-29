@@ -15,7 +15,7 @@ namespace _hps_geometry_geometry_gtest_h_
 {
 using namespace hps;
 
-TEST(GeometryObjects, geometry)
+TEST(geometry, GeometryObjects)
 {
   // Vector2.
   {
@@ -187,7 +187,7 @@ void TestVector2()
     }
   }
 }
-TEST(Vector2, geometry)
+TEST(geometry, Vector2)
 {
   {
     SCOPED_TRACE("Vector2<int>");
@@ -215,7 +215,7 @@ struct LineIntersectLineTest
       enum { MaxCoord = 100, };
       const float kParallelDotBound = 1.0e-2f;
       const float kUnitVecLenSqBound = 1.0e-6f;
-      const float kErrSqBound = 1.0e-5f;
+      const float kErrSqBound = 2.0e-5f;
       enum { MaxOffset = MaxCoord / 2, };
       for (int iteration = 0; iteration < Iterations; ++iteration)
       {
@@ -276,7 +276,7 @@ struct LineIntersectLineTest
     }
   }
 };
-TEST(LineIntersectLine, geometry)
+TEST(geometry, LineIntersectLine)
 {
 #if NDEBUG
   LineIntersectLineTest<100000>::Run();
