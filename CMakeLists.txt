@@ -46,6 +46,8 @@ if(HPS_GTEST_ENABLED)
                           COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
   endif(WIN32)
   add_test(evasion_gtest evasion_gtest)
+  set(COPY_FILES "evasion_vis.py")
+  file(COPY ${COPY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif(HPS_GTEST_ENABLED)
 
 project(evasion_all)
