@@ -352,6 +352,13 @@ void Process::Kill()
   m_process = 0;
 }
 
+int Process::WriteStdin(const std::string& str)
+{
+  int numWritten = 0;
+  write(m_stdin[Fd_Write], str.c_str(), str.size());
+  return numWritten;
+}
+
 int Process::ReadStdout(std::string* str)
 {
   assert(str);

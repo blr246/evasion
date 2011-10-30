@@ -212,10 +212,10 @@ struct LineIntersectLineTest
     // Positive test.
     {
       SCOPED_TRACE("LineIntersectLineTest(): Positive test.");
-      enum { MaxCoord = 100, };
-      const float kParallelDotBound = 1.0e-2f;
+      enum { MaxCoord = 10, };
+      const float kParallelDotBound = 1.0e-3f;
       const float kUnitVecLenSqBound = 1.0e-6f;
-      const float kErrSqBound = 2.0e-5f;
+      const float kErrSqBound = 1.0e-6f;
       enum { MaxOffset = MaxCoord / 2, };
       for (int iteration = 0; iteration < Iterations; ++iteration)
       {
