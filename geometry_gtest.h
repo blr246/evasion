@@ -60,7 +60,7 @@ TEST(geometry, GeometryObjects)
   }
   // AxisAlignedBox.
   {
-    AxisAlignedBox<int> box(Vector2<int>(0, 0), Vector2<int>(100, 100));
+    AxisAlignedBox2<int> box(Vector2<int>(0, 0), Vector2<int>(100, 100));
     EXPECT_EQ(0, box.mins.x);
     EXPECT_EQ(0, box.mins.y);
     EXPECT_EQ(100, box.maxs.x);

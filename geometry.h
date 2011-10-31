@@ -22,6 +22,30 @@ struct Vector2
   enum { Dim = 2, };
   Vector2() : x(0), y(0) {}
   Vector2(const NumericType x_, const NumericType y_) : x(x_), y(y_) {}
+  inline Vector2& operator+=(const Vector2& rhs)
+  {
+    x += rhs.x;
+    y += rhs.y;
+    return *this;
+  }
+  inline Vector2& operator-=(const Vector2& rhs)
+  {
+    x -= rhs.x;
+    y -= rhs.y;
+    return *this;
+  }
+  inline Vector2& operator*=(const NumericType& rhs)
+  {
+    x *= rhs;
+    y *= rhs;
+    return *this;
+  }
+  inline Vector2& operator/=(const NumericType& rhs)
+  {
+    x /= rhs;
+    y /= rhs;
+    return *this;
+  }
   union
   {
     struct
@@ -176,10 +200,10 @@ struct Line
 
 /// <summary> An in-plane box without rotational transformation. </summary>
 template <typename NumericType>
-struct AxisAlignedBox
+struct AxisAlignedBox2
 {
-  AxisAlignedBox() : mins(), maxs() {}
-  AxisAlignedBox(const Vector2<NumericType>& mins_, const Vector2<NumericType>& maxs_)
+  AxisAlignedBox2() : mins(), maxs() {}
+  AxisAlignedBox2(const Vector2<NumericType>& mins_, const Vector2<NumericType>& maxs_)
     : mins(mins_),
       maxs(maxs_)
   {
@@ -261,15 +285,15 @@ inline bool LineIntersectLineUnique(const Line<NumericType>& a,
 }
 
 template <typename NumericType>
-inline NumericType AxisAlignedBoxArea(const AxisAlignedBox<NumericType>& box)
+inline NumericType AxisAlignedBox2Area(const AxisAlignedBox2<NumericType>& box)
 {
   const Vector2<NumericType> dims = box.maxs - box.mins;
   return dims.x * dims.y;
 }
 
 template <typename NumericType>
-inline NumericType AxisAlignedBoxContains(const AxisAlignedBox<NumericType>& box,
-                                          const Vector2<NumericType>& p)
+inline NumericType AxisAlignedBox2Contains(const AxisAlignedBox2<NumericType>& box,
+                                           const Vector2<NumericType>& p)
 {
   return (p.x >= box.mins.x) && (p.x <= box.maxs.x) &&
          (p.y >= box.mins.y) && (p.y <= box.maxs.y);

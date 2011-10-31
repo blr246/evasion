@@ -36,11 +36,13 @@ inline void InitializeVis(const State& state, Process* vis)
 inline void UpdateVis(const State& state, Process* vis)
 {
   assert(vis);
-  std::stringstream ssGameUpdate;
-  ssGameUpdate
+  std::stringstream ssUpdate;
+  const State::Position posP = state.motionP.s;
+  const State::Position posH = state.motionH.s;
+  ssUpdate
     << "<EvasionVis.GameUpdate>"
-    <<   "<PosP>(" << state.motionP.s.x << ", " << state.motionP.s.y << ")</PosP>"
-    <<   "<PosH>(" << state.motionH.s.x << ", " << state.motionH.s.y << ")</PosH>"
+    <<   "<PosP>(" << posP.x << ", " << posP.y << ")</PosP>"
+    <<   "<PosH>(" << posH.x << ", " << posH.y << ")</PosH>"
     <<   "<Walls>[";
   int wallIdx = 0;
   for (State::WallList::const_iterator wall = state.walls.begin();
@@ -49,14 +51,14 @@ inline void UpdateVis(const State& state, Process* vis)
   {
     if (wallIdx > 0)
     {
-      ssGameUpdate << ", ";
+      ssUpdate << ", ";
     }
-    ssGameUpdate << "((" << wall->p0.x << ", " << wall->p0.y << "), "
-                 <<  "(" << wall->p1.x << ", " << wall->p1.y << "))";
+    ssUpdate << "((" << wall->coords.p0.x << ", " << wall->coords.p0.y << "), "
+             <<  "(" << wall->coords.p1.x << ", " << wall->coords.p1.y << "))";
   }
-  ssGameUpdate <<   "]</Walls>"
-               << "</EvasionVis.GameUpdate>" << std::endl;
-  vis->WriteStdin(ssGameUpdate.str());
+  ssUpdate <<   "]</Walls>"
+           << "</EvasionVis.GameUpdate>" << std::endl;
+  vis->WriteStdin(ssUpdate.str());
 }
 
 TEST(evasion_game, DemoVisTest)
