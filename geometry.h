@@ -112,6 +112,14 @@ inline const Vector2<NumericType> operator*(const ScalarType lhs,
   return Vector2<NumericType>(lhs * rhs.x, lhs * rhs.y);
 }
 
+/// <summary> Scalar division for vectors. </summary>
+template <typename NumericType, typename ScalarType>
+inline const Vector2<NumericType> operator/(const Vector2<NumericType>& lhs,
+                                            const ScalarType rhs)
+{
+  return Vector2<NumericType>(lhs.x / rhs, lhs.y / rhs);
+}
+
 /// <summary> Compute vector length squared. </summary>
 template <typename NumericType>
 inline NumericType Vector2LengthSq(const Vector2<NumericType>& v)

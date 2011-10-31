@@ -156,6 +156,14 @@ struct PlyError
   int e;
 };
 
+inline bool WallValid(const State::Wall& wall)
+{
+  return ((State::Wall::Type_Horizontal == wall.type) &&
+          (wall.coords.p0.y == wall.coords.p1.y)) ||
+         ((State::Wall::Type_Vertical == wall.type) &&
+          (wall.coords.p0.x == wall.coords.p1.x));
+}
+
 /// <summary> Do a ply for H in two steps. </sumary>
 /// <remarks>
 ///   <para> Mutate the state with the desires steps for H. H always executes
@@ -166,6 +174,9 @@ struct PlyError
 /// </remarks>
 PlyError DoPly(const StepH& stepH, State* state);
 
+/// <summary> Undo the ply. </summary>
+void UndoPly(const StepH& stepH, State* state);
+
 /// <summary> Do a ply for P. </summary>
 /// <remarks>
 ///   <para> Returns PlyError_Success unless the prey is captured in which
@@ -174,6 +185,9 @@ PlyError DoPly(const StepH& stepH, State* state);
 ///   <para> On error the state is not modified. </para>
 /// </remarks>
 PlyError DoPly(const StepH& stepH, const StepP& stepP, State* state);
+
+/// <summary> Undo the ply. </summary>
+void UndoPly(const StepH& stepH, const StepP& stepP, State* state);
 
 /// <summary> Check if the prey is captured. </summary>
 inline bool GameOver(const State& state)

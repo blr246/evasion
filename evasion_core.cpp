@@ -205,7 +205,9 @@ void MovePlayer(const State& state, State::MotionInfo* motion)
   {
     hitWallV = true;
   }
-  // Check collision with all walls.
+  // Check collision with all walls. Check directions independently.
+  const State::Position posNewV(motion->s.x, posNew.y); // Hits horizontal wall
+  const State::Position posNewH(posNew.x, motion->s.y); // Hits vertical wall
   const State::WallList& walls = state.walls;
   for (State::WallList::const_iterator wall = walls.begin();
        wall != walls.end();
@@ -214,13 +216,13 @@ void MovePlayer(const State& state, State::MotionInfo* motion)
     if (State::Wall::Type_Horizontal == wall->type)
     {
       typedef WallClipHelper<State::Wall::Type_Horizontal> CollisionHelper;
-      hitWallH |= CollisionHelper::CheckCollision(wall->coords, posNew);
+      hitWallH |= CollisionHelper::CheckCollision(wall->coords, posNewV);
     }
     else
     {
       assert(State::Wall::Type_Vertical == wall->type);
       typedef WallClipHelper<State::Wall::Type_Vertical> CollisionHelper;
-      hitWallV |= CollisionHelper::CheckCollision(wall->coords, posNew);
+      hitWallV |= CollisionHelper::CheckCollision(wall->coords, posNewH);
     }
   }
   // Perform reflection. Bounce off of wall type.
@@ -385,6 +387,13 @@ PlyError DoPly(const StepH& stepH, State* state)
     ++state->simTime;
   }
   return err;
+}
+
+void UndoPly(const StepH& stepH, State* state)
+{
+  assert(state);
+  detail::UndoStepH(stepH,  state);
+  --state->simTime;
 }
 
 PlyError DoPly(const StepH& stepH, const StepP& stepP, State* state)
