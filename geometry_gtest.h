@@ -285,20 +285,6 @@ TEST(geometry, LineIntersectLine)
 #endif
 }
 
-TEST(geometry, ClosestPointInSegment)
-{
-  Vector2<float> a = Vector2<float>(0,0);
-  Vector2<float> b = Vector2<float>(0,50);
-  Vector2<float> c = Vector2<float>(50,25);
-
-  Segment2<float> seg;
-  seg.p0 = a; seg.p1 = b;
-
-  Vector2<float> result = ClosestPointInSegment(seg, c);
-  EXPECT_EQ(0, result.x);
-  EXPECT_EQ(25, result.y);
-}
-
 }
 
 #endif //_HPS_GEOMETRY_GEOMETRY_GTEST_H_

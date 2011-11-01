@@ -181,22 +181,6 @@ inline bool operator!=(const Segment2<NumericType>& lhs, const Segment2<NumericT
   return !(lhs == rhs);
 }
 
-template <typename NumericType>
-Vector2<NumericType> ClosestPointInSegment(const Segment2<NumericType>& seg, const Vector2<NumericType> p)
-{
-  Vector2<NumericType> result;
-  NumericType dp;
-  NumericType xDiff = seg.p0.x - seg.p1.x;
-  NumericType yDiff = seg.p0.y - seg.p1.y;
-  dp = (xDiff*(p.x - seg.p1.x) + yDiff*(p.y - seg.p1.y));
-  dp = dp / ((xDiff * xDiff) + (yDiff * yDiff));
-
-  result.x = xDiff*dp + seg.p1.x;
-  result.y = yDiff*dp + seg.p1.y;
-
-  return result;
-}
-
 /// <summary> A segment defined by two points with direction. </summary>
 template <typename NumericType_>
 struct DirectedSegment
@@ -224,6 +208,15 @@ struct Line
   Vector2<NumericType> p0;
   Vector2<NumericType> dir;
 };
+
+template <typename NumericType>
+Line<NumericType> ExtendSegment(Segment2<NumericType> seg)
+{
+  Line<NumericType> l;
+  l.p0 = seg.p0;
+  l.dir = seg.p1 - seg.p0;
+  return l;
+}
 
 /// <summary> An in-plane box without rotational transformation. </summary>
 template <typename NumericType_>
@@ -303,6 +296,20 @@ inline bool LineIntersectLineUnique(const Line<NumericType>& a,
 }
 
 template <typename NumericType>
+Vector2<NumericType> ClosestPointInLine(Line<NumericType> l, Vector2<NumericType> p)
+{
+  Line<NumericType> l2;
+  l2.dir = Vector2Rotate90(l.dir);
+  l2.p0 = p;
+  Vector2<NumericType> result;
+  bool non_parallel = LineIntersectLineUnique(l, l2, &result);
+  if(non_parallel)
+    return result;
+  else
+    return p;
+}
+
+template <typename NumericType>
 inline NumericType AxisAlignedBox2Area(const AxisAlignedBox2<NumericType>& box)
 {
   const Vector2<NumericType> dims = box.maxs - box.mins;
@@ -315,6 +322,24 @@ inline NumericType AxisAlignedBox2Contains(const AxisAlignedBox2<NumericType>& b
 {
   return (p.x >= box.mins.x) && (p.x <= box.maxs.x) &&
          (p.y >= box.mins.y) && (p.y <= box.maxs.y);
+}
+template<typename T, typename U>
+Vector2<U> StaticCastVector2(const Vector2<T>& p)
+{
+  Vector2<U> r;
+  r.x = (U) p.x;
+  r.y = (U) p.y;
+
+  return r;
+}
+template<typename T, typename U>
+Segment2<U> StaticCastSegment(const Segment2<T>& seg)
+{
+  Segment2<U> r;
+  Vector2<U> p0, p1;
+  r.p0 = StaticCastVector2<T, U>(seg.p0);
+  r.p1 = StaticCastVector2<T, U>(seg.p1);
+  return r;
 }
 
 }

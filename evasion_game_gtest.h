@@ -2,6 +2,7 @@
 #define _HPS_EVASION_EVASION_GAME_GTEST_H_
 #include "evasion_core.h"
 #include "process.h"
+#include "prey.h"
 #include <vector>
 #include <string>
 #include <sstream>
@@ -88,7 +89,7 @@ TEST(evasion_game, RandomStrategy)
   Process vis;
   InitializeVis(state, &vis);
 
-  enum { MaxIterations = 10000, };
+  enum { MaxIterations = 100, };
   enum { MoveType_H = 2, };
   int moveType = MoveType_H;
   // We will limit iterations here for demo purposes.
@@ -142,8 +143,99 @@ TEST(evasion_game, RandomStrategy)
     }
     else
     {
-      StepP stepP;
-      stepP.moveDir = State::Direction(RandBound(3) - 1, RandBound(3) - 1);
+      RandomPrey p;
+      StepP stepP = p.NextStep(state);
+      err = DoPly(stepH, stepP, &state);
+    }
+    // Do-over on case when the move does not succeed. This happens rarely when
+    // H is trapped in a minutely confined space.
+    if (PlyError::Success != err)
+    {
+      continue;
+    }
+    UpdateVis(state, &vis);
+    ++moveType;
+  }
+
+  // Vis will quit when it receives an empty line.
+  vis.WriteStdin(std::string("\r\n"));
+  vis.Join();
+
+  if (PreyCaptured(state))
+  {
+    std::cout << "Prey captured at time " << state.simTime << "." << std::endl;
+  }
+  else
+  {
+    std::cout << "Timed out at time " << state.simTime << "." << std::endl;
+  }
+}
+TEST(evasion_game, GreedyPreyRandomHunter)
+{
+  // Game state.
+  State state;
+  Initialize(3, 3, &state);
+
+  // Create a vis process.
+  Process vis;
+  InitializeVis(state, &vis);
+
+  enum { MaxIterations = 100, };
+  enum { MoveType_H = 2, };
+  int moveType = MoveType_H;
+  // We will limit iterations here for demo purposes.
+  // Do limited number of iterations.
+  while (moveType < MaxIterations)
+  {
+    int dueTime;
+    const bool makeWallLocked = (WallCreationLockedOut(state, &dueTime));
+    const bool noWalls = state.walls.empty();
+    enum { NWallMkProb = 50, };
+    enum { NWallRmProb = 200, };
+    // Make walls exclusively from removing them in this test.
+    const bool makeWall = !makeWallLocked && (0 == RandBound(NWallMkProb));
+    const bool rmWall = !noWalls && !makeWall && (0 == RandBound(NWallRmProb));
+    // First setup the move.
+    StepH stepH;
+    if (rmWall)
+    {
+      assert(!makeWall);
+      // Copy walls and random shuffle.
+      State::WallList walls = state.walls;
+      std::random_shuffle(walls.begin(), walls.end());
+      // Remove random wall(s).
+      const int rmCount = RandBound(walls.size()) + 1;
+      stepH.removeWalls.resize(rmCount);
+      std::copy(walls.begin(), walls.begin() + rmCount,
+                stepH.removeWalls.begin());
+    }
+    else
+    {
+      // Either make a wall or do nothing.
+      assert((makeWall && !rmWall) || (!makeWall && !rmWall));
+      if (makeWall)
+      {
+        const int wallType = RandBound(2);
+        if (0 == wallType)
+        {
+          stepH.wallCreateFlag = StepH::WallCreate_Horizontal;
+        }
+        else
+        {
+          stepH.wallCreateFlag = StepH::WallCreate_Vertical;
+        }
+      }
+    }
+    PlyError err;
+    // Alternate between {H} and {H, P} moves.
+    if (0 == (moveType % MoveType_H))
+    {
+      err = DoPly(stepH, &state);
+    }
+    else
+    {
+      ScaredPrey p;
+      StepP stepP = p.NextStep(state);
       err = DoPly(stepH, stepP, &state);
     }
     // Do-over on case when the move does not succeed. This happens rarely when

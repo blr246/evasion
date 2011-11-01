@@ -3,6 +3,7 @@
 #include "evasion_core.h"
 #include "rand_bound.h"
 #include <vector>
+#include <iostream>
 namespace hps
 {
 namespace evasion
@@ -24,53 +25,80 @@ struct RandomPrey{
   }
 };
 
-struct GreedyPrey{
+struct ScaredPrey{
   StepP NextStep(State& state)
   {
     const State::Position& pPos = state.posStackP.back();
+    Vector2<float> FpPos = StaticCastVector2<int, float>(pPos);
     const State::Position& hPos = state.motionH.pos;
 
     StepP step;
 
-      double minWallDistance = 100000;
-      Segment2<int> closestWall;
-      Vector2<int> closestPoint;
-      
-      for(int i = 0; i < state.walls.size(); i++)
+      int minWallDistance = 100000;
+      Segment2<float> closestWall;
+      Vector2<float> closestPoint;
+
+      std::vector<Segment2<int> > walls;
+      for(int i =  0; i < state.walls.size(); i++)
       {
-        Vector2<int> point = ClosestPointInSegment(state.walls[i].coords, pPos);
-        double wallDist = Vector2Length(point - pPos);
+        walls.push_back(state.walls[i].coords);
+      }
+      
+      Segment2<int> fakeHunterWall;
+      fakeHunterWall.p0 = hPos;
+      fakeHunterWall.p1.x = hPos.x + 10000*state.motionH.dir.x;
+      fakeHunterWall.p1.y = hPos.y + 10000*state.motionH.dir.y;
+
+      walls.push_back(fakeHunterWall);
+
+      Segment2<int> top;
+      top.p0 = Vector2<int>(0,0);
+      top.p1 = Vector2<int>(0,BoardSizeX);
+      Segment2<int> left;
+      left.p0 = Vector2<int>(0,0);
+      left.p1 = Vector2<int>(BoardSizeY,0);
+      Segment2<int> bottom;
+      bottom.p0 = Vector2<int>(BoardSizeY,0);
+      bottom.p1 = Vector2<int>(BoardSizeY,BoardSizeX);
+      Segment2<int> right;
+      right.p0 = Vector2<int>(0,BoardSizeX);
+      right.p1 = Vector2<int>(BoardSizeY,BoardSizeX);
+      walls.push_back(top);
+      walls.push_back(left);
+      walls.push_back(bottom);
+      walls.push_back(right);
+
+      for(int i = 0; i < walls.size(); i++)
+      {
+        Segment2<float> seg = StaticCastSegment<int, float>(walls[i]);
+        Line<float> l1 = ExtendSegment(seg);
+        Vector2<float> point = ClosestPointInLine(l1, FpPos);
+        int wallDist = Vector2LengthSq(point - FpPos);
         if(wallDist < minWallDistance){
-          closestWall = state.walls[i].coords;
+          closestWall = seg;
           minWallDistance = wallDist;
           closestPoint = point;
         }
       }
 
-      Segment2<int> fakeHunterWall;
-      fakeHunterWall.p0 = hPos;
-      fakeHunterWall.p1 = hPos + 1000*state.motionH.dir;
-      Vector2<int> point = ClosestPointInSegment(fakeHunterWall, pPos);
-      double wallDist = Vector2Length(point - pPos);
-      if(wallDist < minWallDistance){
-        closestWall = fakeHunterWall;
-        closestPoint = point;
-      }
-
-    int distX = closestPoint.x - hPos.x;
+    int distX = FpPos.x - closestPoint.x;
     if(distX > 0)
     {
-      step.moveDir.x = 1;
+      step.moveDir.x = 1; // Prey is to the left of the closest wall
+    }else if(distX == 0){
+      step.moveDir.x = 0;
     }else{
-      step.moveDir.x = -1;
+      step.moveDir.x = -1; // Prey is to the right of the closest wall
     }
     
-    int distY = closestPoint.y - hPos.y;
+    int distY = FpPos.y - closestPoint.y;
     if(distY > 0)
     {
-      step.moveDir.y = 1;
+      step.moveDir.y = 1; // Prey is above the closest wall
+    }else if(distY == 0){
+      step.moveDir.y = 0;
     }else{
-      step.moveDir.y = -1;
+      step.moveDir.y = -1; // Prey is below the closest wall
     }
 
     distX = pPos.x - hPos.x;
@@ -87,6 +115,7 @@ struct GreedyPrey{
     return step;
   }
 };
+
 
 }
 }

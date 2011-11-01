@@ -17,16 +17,16 @@ namespace prey_gtest
     p.NextStep(state);
   }
 
-  TEST(GreedyPrey, NextStep)
+  TEST(ScaredPrey, NextStep)
   {
     State state;
     Initialize(3, 3, &state);
 
-    GreedyPrey p;
+    ScaredPrey p;
     StepP step = p.NextStep(state);
 
     EXPECT_EQ(step.moveDir.x, 1);
-    EXPECT_EQ(step.moveDir.y, 1);
+    EXPECT_EQ(step.moveDir.y, -1);
   }
 }
 #endif //_HPS_EVASION_prey_GTEST_
