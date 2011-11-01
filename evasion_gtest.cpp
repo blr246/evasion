@@ -4,6 +4,7 @@
 #include "evasion_core_gtest.h"
 #include "evasion_game_gtest.h"
 #include "hunter_gtest.h"
+#include "prey_gtest.h"
 #include "gtest/gtest.h"
 #ifdef WIN32
 #include <time.h>
