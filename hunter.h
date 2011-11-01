@@ -61,7 +61,7 @@ struct BasicHunter : public Hunter{
     
   Directions GetPreyDirection(int numerator, int denominator)
   {
-    Directions dirP;
+    Directions dirP = Still;
     // gives the direction pf motion of prey.
     if(numerator < 0 && denominator > 0 )
     {
@@ -94,10 +94,6 @@ struct BasicHunter : public Hunter{
     else if(numerator == 0 && denominator < 0)
     {
         dirP = West;
-    }
-    else if(numerator == 0 and denominator == 0)
-    {
-        dirP = Still;
     }
     return dirP;
   }

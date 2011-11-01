@@ -303,6 +303,15 @@ TEST(evasion_core, PlyH)
   }
 }
 
+TEST(evasion_core, CreateWall)
+{
+  // Try to reproduce the horizontal clipping bug.
+  {
+    State state;
+    Initialize(3, 3, &state);
+  }
+}
+
 }
 
 #endif //_HPS_EVASION_EVASION_CORE_GTEST_H_

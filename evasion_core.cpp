@@ -127,37 +127,38 @@ State::Wall CreateClipped(const State::Position& pt,
   typedef State::Wall Wall;
   typedef State::Wall::Coordinates WallCoordinates;
   typedef WallClipHelper<WallDirection> CoordHelp;
-    const int fixed = CoordHelp::GetFixed(pt);
-    Wall wall;
-    {
-      wall.type = static_cast<State::Wall::Type>(WallDirection);
-      wall.coords = CoordHelp::InitWallCoords(fixed);
-    }
-    WallCoordinates& wallCoords = wall.coords;
-    // Clip wall using all perpendicular walls.
-    for (WallList::const_iterator clipW = first; clipW != last; ++clipW)
-    {
-      const WallCoordinates& clipCoords = clipW->coords;
+  const int fixed = CoordHelp::GetFixed(pt);
+  Wall wall;
+  {
+    wall.type = static_cast<State::Wall::Type>(WallDirection);
+    wall.coords = CoordHelp::InitWallCoords(fixed);
+  }
+  WallCoordinates& wallCoords = wall.coords;
+  // Clip wall using all perpendicular walls.
+  for (WallList::const_iterator clipW = first; clipW != last; ++clipW)
+  {
+    const WallCoordinates& clipCoords = clipW->coords;
+    // Does wall cross the that we're clipping?
     if ((static_cast<int>(CoordHelp::OtherDirection) == clipW->type) &&
-          ((CoordHelp::GetFixed(clipCoords.p0) <= fixed) &&
-           (CoordHelp::GetFixed(clipCoords.p1) >= fixed)))
-      {
+        ((CoordHelp::GetFixed(clipCoords.p0) <= fixed) &&
+         (CoordHelp::GetFixed(clipCoords.p1) >= fixed)))
+    {
         // Clip wall toward H.
-        assert(CoordHelp::GetClip(clipCoords.p0) ==
-               CoordHelp::GetClip(clipCoords.p1));
+        assert(CoordHelp::GetClip(clipCoords.p0) == CoordHelp::GetClip(clipCoords.p1));
         const int clip = CoordHelp::GetClip(clipCoords.p0);
-        int& clipped = CoordHelp::GetClip(wallCoords.p0);
         if (clip <= CoordHelp::GetClip(pt))
         {
+          int& clipped = CoordHelp::GetClip(wallCoords.p0);
           clipped = std::max(clip, clipped);
         }
         else
         {
+          int& clipped = CoordHelp::GetClip(wallCoords.p1);
           clipped = std::min(clip, clipped);
         }
-      }
     }
-    return wall;
+  }
+  return wall;
 }
 
 /// <summary> See if the point collides with the wall. </sumamry>
