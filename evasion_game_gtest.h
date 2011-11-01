@@ -78,10 +78,11 @@ TEST(evasion_game, DemoVisTest)
   vis.Join();
 }
 
-TEST(evasion_game, NoStrategy)
+TEST(evasion_game, RandomStrategy)
 {
   // Game state.
   State state;
+  Initialize(3, 3, &state);
 
   // Create a vis process.
   Process vis;
@@ -91,18 +92,56 @@ TEST(evasion_game, NoStrategy)
   enum { MoveType_H = 2, };
   int moveType = MoveType_H;
   // The Hunter cannot win. We will limit iterations here for demo purposes.
-  while (moveType < 1000)
+  while (!PreyCaptured(state))
   {
     if (0 == (moveType % MoveType_H))
     {
       StepH stepH;
-      DoPly(stepH, &state);
+      int dueTime;
+      if (WallCreationLockedOut(state, &dueTime))
+      {
+        // 1 in N shot of removing a wall.
+        enum { NWallRmProb = 200, };
+        const int rmWalls = RandBound(NWallRmProb);
+        if (0 == rmWalls)
+        {
+          State::WallList walls = state.walls;
+          const int rmCount = RandBound(walls.size()) + 1;
+          std::random_shuffle(walls.begin(), walls.end());
+          // Remove random wall(s).
+          stepH.removeWalls.resize(rmCount);
+          std::copy(walls.begin(), walls.begin() + rmCount,
+                    stepH.removeWalls.begin());
+        }
+      }
+      else
+      {
+        // 1 in N shot of making a wall.
+        enum { NWallMkProb = 50, };
+        const int makeWall = RandBound(NWallMkProb);
+        if (0 == makeWall)
+        {
+          const int wallType = RandBound(2);
+          if (0 == wallType)
+          {
+            stepH.wallCreateFlag = StepH::WallCreate_Horizontal;
+          }
+          else
+          {
+            stepH.wallCreateFlag = StepH::WallCreate_Vertical;
+          }
+        }
+      }
+      if (PlyError::Success != DoPly(stepH, &state))
+      {
+        continue;
+      }
     }
     else
     {
       StepH stepH;
       StepP stepP;
-      stepP.moveDir = State::Direction(0, 0);
+      stepP.moveDir = State::Direction(RandBound(3) - 1, RandBound(3) - 1);
       DoPly(stepH, stepP, &state);
     }
     UpdateVis(state, &vis);
@@ -112,6 +151,8 @@ TEST(evasion_game, NoStrategy)
   // Vis will quit when it receives an empty line.
   vis.WriteStdin(std::string("\r\n"));
   vis.Join();
+
+  std::cout << "Prey captured at time " << state.simTime << "." << std::endl;
 }
 
 }

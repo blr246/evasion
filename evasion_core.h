@@ -115,6 +115,8 @@ struct State
   int maxWalls;
   /// <summary> State of the prey. </sumamry>
   PreyState preyState;
+  /// <summary> Temporary memory for walls manipulation. </summary>
+  WallList wallsTemp;
 };
 
 /// <summary> Data used for H to move one step. </summary>
@@ -233,7 +235,7 @@ inline bool WallCreationLockedOut(const State& state, int* simTimeUnlocked)
 {
   assert(simTimeUnlocked);
   // See if walls maxed out.
-  if (state.maxWalls == static_cast<int>(state.walls.size()))
+  if (state.maxWalls <= static_cast<int>(state.walls.size()))
   {
     *simTimeUnlocked = std::numeric_limits<int>::max();
     return true;
@@ -242,7 +244,7 @@ inline bool WallCreationLockedOut(const State& state, int* simTimeUnlocked)
   {
     const int simTimeDue = state.simTimeLastWall + state.wallCreatePeriod;
     *simTimeUnlocked = simTimeDue - state.simTime;
-    return (simTimeUnlocked > 0);
+    return (*simTimeUnlocked > 0);
   }
 }
 

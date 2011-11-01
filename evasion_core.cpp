@@ -66,7 +66,7 @@ inline std::ostream& operator<<(std::ostream& strm, const PlyError err)
 
 State::State()
 : simTime(0),
-  simTimeLastWall(0),
+  simTimeLastWall(-1),
   posStackP(),
   motionH(),
   walls(),
@@ -257,17 +257,15 @@ PlyError DoStepH(const StepH& step, State* state)
   assert(state);
   PlyError err(PlyError::Success);
   State::WallList& walls = state->walls;
+  State::WallList& wallsTemp = state->wallsTemp;
+  wallsTemp = walls;
   State::Wall wall;
   wall.simTimeCreate = state->simTime;
-  const int numWalls = static_cast<int>(walls.size());
   // Record if Hunter is stuck.
   const bool stuckBefore = (state->motionH.simTimeStuck !=
                             State::HunterMotionInfo::Flag_NotStuck);
   bool unstuck = false;
-  // See if wall removals are valid. Use walls as temporary storage.
-  // Copy walls to itself for temporary storage.
-  walls.resize(2 * numWalls);
-  std::copy(walls.begin(), walls.begin() + numWalls, walls.begin() + numWalls);
+  // See if wall removals are valid. Use wallsTemp as temporary storage.
   const bool wantRemoveWall = !step.removeWalls.empty();
   if (wantRemoveWall)
   {
@@ -279,8 +277,8 @@ PlyError DoStepH(const StepH& step, State* state)
          rmWall != removeWalls.end();
          ++rmWall)
     {
-      WallRemovePos rmPos = std::remove(walls.begin() + numWalls,
-                                        walls.end(), *rmWall);
+      WallRemovePos rmPos = std::remove(wallsTemp.begin(), wallsTemp.end(),
+                                        *rmWall);
       // See if we are unstuck by a wall removal.
       if (stuckBefore && !unstuck)
       {
@@ -295,10 +293,10 @@ PlyError DoStepH(const StepH& step, State* state)
         }
       }
       // Remove wall is valid?
-      if (walls.end() != rmPos)
+      if (wallsTemp.end() != rmPos)
       {
-        rmPos = walls.erase(rmPos);
-        assert((walls.end() == rmPos) && "Walls must be unique.");
+        rmPos = wallsTemp.erase(rmPos);
+        assert((wallsTemp.end() == rmPos) && "Walls must be unique.");
       }
       else
       {
@@ -314,7 +312,7 @@ PlyError DoStepH(const StepH& step, State* state)
   if (!stuckBefore || unstuck)
   {
      const bool stuckNow = !MovePlayer(state->board,
-                                       walls.begin() + numWalls, walls.end(),
+                                       wallsTemp.begin(), wallsTemp.end(),
                                        state->motionH.pos, state->motionH.dir,
                                        &motionHNew.pos, &motionHNew.dir);
      if (stuckNow)
@@ -343,11 +341,11 @@ PlyError DoStepH(const StepH& step, State* state)
       // See if wall will intersect P by first creating the wall.
       const State::Position& posH = state->motionH.pos;
       const State::Position& posP = state->posStackP.back();
-      const State::WallList::const_iterator firstWall = walls.begin() + numWalls;
       if (StepH::WallCreate_Horizontal == step.wallCreateFlag)
       {
         assert(StepH::WallCreate_Horizontal == step.wallCreateFlag);
-        wall = CreateClipped<State::Wall::Type_Horizontal>(posH, firstWall, walls.end());
+        wall = CreateClipped<State::Wall::Type_Horizontal>(posH,
+                                                           wallsTemp.begin(), wallsTemp.end());
         assert(State::Wall::Type_Horizontal == wall.type);
         // Check interference.
         if (CheckCollision<State::Wall::Type_Horizontal>(wall.coords, posP))
@@ -366,7 +364,8 @@ PlyError DoStepH(const StepH& step, State* state)
       else
       {
         assert(StepH::WallCreate_Vertical == step.wallCreateFlag);
-        wall = CreateClipped<State::Wall::Type_Vertical>(posH, firstWall, walls.end());
+        wall = CreateClipped<State::Wall::Type_Vertical>(posH,
+                                                         wallsTemp.begin(), wallsTemp.end());
         assert(State::Wall::Type_Vertical == wall.type);
         // Check interference.
         if (CheckCollision<State::Wall::Type_Vertical>(wall.coords, posP))
@@ -388,26 +387,20 @@ PlyError DoStepH(const StepH& step, State* state)
   // and check for collisions.
   if (PlyError::Success == err)
   {
-    const int wallsNow = numWalls - static_cast<int>(step.removeWalls.size());
     if (wantRemoveWall)
     {
-      std::copy(walls.begin() + numWalls, walls.end(), walls.begin());
-      std::make_heap(walls.begin(), walls.begin() + wallsNow, State::Wall::Sort());
+      walls = wallsTemp;
+      std::make_heap(walls.begin(), walls.end(), State::Wall::Sort());
     }
-    walls.resize(wallsNow);
     if (wantCreateWall)
     {
       walls.push_back(wall);
       std::push_heap(walls.begin(), walls.end(), State::Wall::Sort());
+      state->simTimeLastWall = state->simTime;
     }
     state->motionH = motionHNew;
   }
-  // Reset any recoverable mutations to data when there is an error.
-  else
-  {
-    // Used temporary data at the end of wall; release it.
-    walls.resize(numWalls);
-  }
+  wallsTemp.clear();
   return err;
 }
 /// <summary> Internal helper function to undo an H step. </summary>
@@ -434,6 +427,15 @@ inline void UndoStepH(const StepH& step, State* state)
   {
     std::pop_heap(walls.begin(), walls.end(), State::Wall::Sort());
     walls.pop_back();
+    assert((state->simTime - 1) == walls.front().simTimeCreate);
+    if (walls.empty())
+    {
+      state->simTimeLastWall = state->wallCreatePeriod;
+    }
+    else
+    {
+      state->simTimeLastWall = walls.front().simTimeCreate;
+    }
   }
   // Replace removed walls and maintain order.
   const State::Position& posH = state->motionH.pos;

@@ -112,11 +112,12 @@ class EvasionVis(object):
         self._canvas.update()
 
     def _draw_board(self):
-        self._canvas.create_rectangle(self._vo_x,
-                                      self._vo_y,
-                                      self._vo_x + self._setup_params.dimx,
-                                      self._vo_y + self._setup_params.dimy,
-                                      outline='white', width=2)
+        WALL_WIDTH = 2
+        mins = (self._vo_x - WALL_WIDTH, self._vo_y - WALL_WIDTH)
+        maxs = (self._vo_x + self._setup_params.dimx + WALL_WIDTH,
+                self._vo_y + self._setup_params.dimy + WALL_WIDTH)
+        self._canvas.create_rectangle(mins, maxs,
+                                      outline='white', width=WALL_WIDTH)
 
     def redraw(self):
         ''' Draw the canvas again. '''
