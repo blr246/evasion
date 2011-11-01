@@ -261,7 +261,6 @@ PlyError DoStepH(const StepH& step, State* state)
   State::WallList& wallsTemp = state->wallsTemp;
   wallsTemp = walls;
   State::Wall wall;
-  wall.simTimeCreate = state->simTime;
   // Record if Hunter is stuck.
   const bool stuckBefore = (state->motionH.simTimeStuck !=
                             State::HunterMotionInfo::Flag_NotStuck);
@@ -347,6 +346,7 @@ PlyError DoStepH(const StepH& step, State* state)
         assert(StepH::WallCreate_Horizontal == step.wallCreateFlag);
         wall = CreateClipped<State::Wall::Type_Horizontal>(posH,
                                                            wallsTemp.begin(), wallsTemp.end());
+        wall.simTimeCreate = state->simTime + 1;
         assert(State::Wall::Type_Horizontal == wall.type);
         // Check interference.
         if (CheckCollision<State::Wall::Type_Horizontal>(wall.coords, posP))
@@ -428,10 +428,10 @@ inline void UndoStepH(const StepH& step, State* state)
   {
     std::pop_heap(walls.begin(), walls.end(), State::Wall::Sort());
     walls.pop_back();
-    assert((state->simTime - 1) == walls.front().simTimeCreate);
+    assert(state->simTime == walls.front().simTimeCreate);
     if (walls.empty())
     {
-      state->simTimeLastWall = state->wallCreatePeriod;
+      state->simTimeLastWall = -state->wallCreatePeriod;
     }
     else
     {
