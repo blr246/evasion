@@ -647,8 +647,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
       {
         return false;
       }
-      std::stringstream ssTok(token);
-      ssTok >> motionH.pos.y;
+      ExtractToken(token, &motionH.pos.y);
     }
     // Dx
     {
@@ -657,8 +656,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
       {
         return false;
       }
-      std::stringstream ssTok(token);
-      ssTok >> motionH.dir.x;
+      ExtractToken(token, &motionH.dir.x);
     }
     // Dy
     {
@@ -667,8 +665,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
       {
         return false;
       }
-      std::stringstream ssTok(token);
-      ssTok >> motionH.dir.y;
+      ExtractToken(token, &motionH.dir.y);
     }
   }
   // Line 3.
@@ -686,8 +683,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
       {
         return false;
       }
-      std::stringstream ssTok(token);
-      ssTok >> posP.x;
+      ExtractToken(token, &posP.x);
     }
     // Py
     {
@@ -696,8 +692,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
       {
         return false;
       }
-      std::stringstream ssTok(token);
-      ssTok >> posP.y;
+      ExtractToken(token, &posP.y);
     }
   }
   // Line 4.
@@ -731,10 +726,51 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
         {
           return false;
         }
-        std::stringstream ssTok(token);
-        ssTok >> posP.x;
+        ExtractToken(token, &wallIdx);
       }
+      // Read the wall.
+      State::Wall wall;
+      {
+        // p0.x
+        {
+          std::string token;
+          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          {
+            return false;
+          }
+          ExtractToken(token, &wall.coords.p0.x);
+        }
+        // p0.y
+        {
+          std::string token;
+          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          {
+            return false;
+          }
+          ExtractToken(token, &wall.coords.p0.y);
+        }
+        // p1.x
+        {
+          std::string token;
+          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          {
+            return false;
+          }
+          ExtractToken(token, &wall.coords.p1.x);
+        }
+        // p1.y
+        {
+          std::string token;
+          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          {
+            return false;
+          }
+          ExtractToken(token, &wall.coords.p1.y);
+        }
+      }
+      // Add the wall.
       ++wallCount;
+      state->walls.push_back(wall);
       // Record this wall mapping.
       const int wallId = -wallCount;
       state->mapSimTimeToIdx[wallId] = wallIdx;
