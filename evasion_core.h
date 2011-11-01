@@ -242,7 +242,7 @@ inline bool WallCreationLockedOut(const State& state, int* simTimeUnlocked)
   }
   else
   {
-    const int simTimeDue = state.simTimeLastWall + state.wallCreatePeriod - 1;
+    const int simTimeDue = state.simTimeLastWall + state.wallCreatePeriod;
     *simTimeUnlocked = simTimeDue - state.simTime;
     return (*simTimeUnlocked > 0);
   }
