@@ -143,9 +143,10 @@ inline bool Vector2NearlyEqual(const Vector2<NumericType>& lhs,
 }
 
 /// <summary> A segment defined by two points. </summary>
-template <typename NumericType>
+template <typename NumericType_>
 struct Segment2
 {
+  typedef NumericType_ NumericType;
   Segment2() : p0(), p1() {}
   Segment2(const Vector2<NumericType>& p0_, const Vector2<NumericType>& p1_)
     : p0(p0_),
@@ -181,9 +182,10 @@ inline bool operator!=(const Segment2<NumericType>& lhs, const Segment2<NumericT
 }
 
 /// <summary> A segment defined by two points with direction. </summary>
-template <typename NumericType>
+template <typename NumericType_>
 struct DirectedSegment
 {
+  typedef NumericType_ NumericType;
   DirectedSegment() : p0(), p1() {}
   DirectedSegment(const Vector2<NumericType>& p0_, const Vector2<NumericType>& p1_)
     : p0(p0_),
@@ -194,9 +196,10 @@ struct DirectedSegment
 };
 
 /// <summary> A line given by point and direction. </summary>
-template <typename NumericType>
+template <typename NumericType_>
 struct Line
 {
+  typedef NumericType_ NumericType;
   Line() : p0(), dir() {}
   Line(const Vector2<NumericType>& p0_, const Vector2<NumericType>& dir_)
     : p0(p0_),
@@ -207,9 +210,10 @@ struct Line
 };
 
 /// <summary> An in-plane box without rotational transformation. </summary>
-template <typename NumericType>
+template <typename NumericType_>
 struct AxisAlignedBox2
 {
+  typedef NumericType_ NumericType;
   AxisAlignedBox2() : mins(), maxs() {}
   AxisAlignedBox2(const Vector2<NumericType>& mins_, const Vector2<NumericType>& maxs_)
     : mins(mins_),
@@ -222,22 +226,12 @@ struct AxisAlignedBox2
   Vector2<NumericType> maxs;
 };
 
-//template <typename NumericType>
-//struct HitTestBox
-//{
-//  enum { BoxSides = 4, };
-//  union
-//  {
-//    struct
-//    {
-//      Line<NumericType> left;
-//      Line<NumericType> top;
-//      Line<NumericType> right;
-//      Line<NumericType> bottom;
-//    };
-//    Line<NumericType> lines[BoxSides];
-//  };
-//};
+template <typename NumericType>
+inline bool operator==(const AxisAlignedBox2<NumericType>& lhs,
+                       const AxisAlignedBox2<NumericType>& rhs)
+{
+  return (lhs.mins == rhs.mins) && (lhs.maxs == rhs.maxs);
+}
 
 /// <summary> Rotate vector 90 degrees counter-clockwise. </summary>
 template <typename NumericType>

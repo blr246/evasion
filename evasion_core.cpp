@@ -77,7 +77,7 @@ State::State()
   motionP(Position(PInitialPosition::X, PInitialPosition::Y), Direction(0, 0)),
   motionH(Position(HInitialPosition::X, HInitialPosition::Y), Direction(1, 1)),
   walls(),
-  board(Vector2<int>(0, 0), Vector2<int>(BoardSizeX, BoardSizeY)),
+  board(Vector2<int>(0, 0), Vector2<int>(BoardSizeX - 1, BoardSizeY - 1)),
   wallCreatePeriod(0),
   maxWalls(0),
   preyCaptureInfo(std::make_pair(Prey_Evading, 0))
@@ -183,20 +183,20 @@ struct WallClipHelper
 ///     the curren time step prior to applying this function.
 ///   </para>
 /// </remarks>
-void MovePlayer(const State& state, State::MotionInfo* motion)
+void MovePlayer(const State::Board& board, const State::WallList& walls,
+                const State::MotionInfo& motion, State::MotionInfo* newMotion)
 {
-  assert(motion);
+  assert(newMotion);
   // Nothing to do when player is stationary.
   static const State::Direction moveZero(0, 0);
-  if (moveZero == motion->d)
+  if (moveZero == motion.d)
   {
     return;
   }
-  const State::Position posNew = motion->s + motion->d;
+  const State::Position posNew = motion.s + motion.d;
   bool hitWallH = false;
   bool hitWallV = false;
   // Check collision with board.
-  const State::Board& board = state.board;
   if ((posNew.y < board.mins.y) || (board.maxs.y < posNew.y))
   {
     hitWallH = true;
@@ -206,9 +206,8 @@ void MovePlayer(const State& state, State::MotionInfo* motion)
     hitWallV = true;
   }
   // Check collision with all walls. Check directions independently.
-  const State::Position posNewV(motion->s.x, posNew.y); // Hits horizontal wall
-  const State::Position posNewH(posNew.x, motion->s.y); // Hits vertical wall
-  const State::WallList& walls = state.walls;
+  const State::Position posNewV(motion.s.x, posNew.y); // Hits horizontal wall
+  const State::Position posNewH(posNew.x, motion.s.y); // Hits vertical wall
   for (State::WallList::const_iterator wall = walls.begin();
        wall != walls.end();
        ++wall)
@@ -228,14 +227,15 @@ void MovePlayer(const State& state, State::MotionInfo* motion)
   // Perform reflection. Bounce off of wall type.
   if (hitWallH)
   {
-    motion->d.y *= -1;
+    newMotion->d.y *= -1;
   }
   if (hitWallV)
   {
-    motion->d.x *= -1;
+    newMotion->d.x *= -1;
   }
-  // Move player.
-  motion->s += motion->d;
+  // Move player. Do not advance reflected coordinates.
+  newMotion->s += State::Direction(!hitWallV * motion.d.x,
+                                   !hitWallH * motion.d.y);
 }
 /// <summary> Internal helper function to apply an H step. </summary>
 PlyError DoStepH(const StepH& step, State* state)
@@ -246,6 +246,9 @@ PlyError DoStepH(const StepH& step, State* state)
   State::Wall wall;
   wall.simTimeCreate = state->simTime;
   const int numWalls = static_cast<int>(walls.size());
+  // Get player's new position.
+  State::MotionInfo motionHNew = state->motionH;
+  MovePlayer(state->board, state->walls, state->motionH, &motionHNew);
   // See if wall creation requested and allowed.
   const bool wantCreateWall = StepH::WallCreate_None != step.wallCreateFlag;
   if (wantCreateWall)
@@ -276,6 +279,12 @@ PlyError DoStepH(const StepH& step, State* state)
                     << "since P is in the way." << std::endl;
           err |= PlyError::WallCreateInterference;
         }
+        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.s))
+        {
+          std::cerr << "DoStepH() : Creation of horizontal wall cannot proceed "
+                    << "since H moves in the way." << std::endl;
+          err |= PlyError::WallCreateInterference;
+        }
       }
       else
       {
@@ -288,6 +297,12 @@ PlyError DoStepH(const StepH& step, State* state)
         {
           std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
                     << "since P is in the way." << std::endl;
+          err |= PlyError::WallCreateInterference;
+        }
+        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.s))
+        {
+          std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
+                    << "since H moves in the way." << std::endl;
           err |= PlyError::WallCreateInterference;
         }
       }
@@ -340,10 +355,7 @@ PlyError DoStepH(const StepH& step, State* state)
       walls.push_back(wall);
       std::push_heap(walls.begin(), walls.end(), State::Wall::Sort());
     }
-    // reissb -- 20111030 -- We do not have to check collision with the new wall
-    //   since H moves diagonally. This guarantees that he will not collide with
-    //   any new walls.
-    MovePlayer(*state, &state->motionH);
+    state->motionH = motionHNew;
   }
   // Reset any recoverable mutations to data when there is an error.
   else
@@ -357,9 +369,9 @@ PlyError DoStepH(const StepH& step, State* state)
 inline void UndoStepH(const StepH& step, State* state)
 {
   State::WallList& walls = state->walls;
-  // Undo H motion.
+  // Undo H motion. Need to move twice to fix collisions.
   state->motionH.d *= -1;
-  MovePlayer(*state, &state->motionH);
+  MovePlayer(state->board, state->walls, state->motionH, &state->motionH);
   state->motionH.d *= -1;
   // Remove added wall (order maintained by sorting).
   if (StepH::WallCreate_None != step.wallCreateFlag)
@@ -394,6 +406,7 @@ void UndoPly(const StepH& stepH, State* state)
   assert(state);
   detail::UndoStepH(stepH,  state);
   --state->simTime;
+  assert(state->simTime >= 0);
 }
 
 PlyError DoPly(const StepH& stepH, const StepP& stepP, State* state)

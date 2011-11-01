@@ -127,6 +127,7 @@ struct StepP
   State::Direction moveDir;
 };
 
+/// <summary> Bitwise or'd collection of error flags on DoPly(). </summary>
 struct PlyError
 {
   enum
@@ -156,6 +157,7 @@ struct PlyError
   int e;
 };
 
+/// <summary> Helper function to verify wall coordinates. </summary>
 inline bool WallValid(const State::Wall& wall)
 {
   return ((State::Wall::Type_Horizontal == wall.type) &&
