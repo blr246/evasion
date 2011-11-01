@@ -3,6 +3,7 @@
 #include "evasion_core.h"
 #include "process.h"
 #include "prey.h"
+#include "hunter.h"
 #include <vector>
 #include <string>
 #include <sstream>
@@ -187,6 +188,52 @@ TEST(evasion_game, ExtremePreyRandomHunter)
   ExtremePrey p;
   enum { MaxIterations = 100, };
   TestPrey(p, MaxIterations);
+}
+
+TEST(BasicHunter, Play)
+{
+    // Game state.
+    State state;
+    Initialize(3, 3, &state);
+    BasicHunter hunter;
+    RandomPrey prey;
+    
+    // Create a vis process.
+    Process vis;
+    InitializeVis(state, &vis);
+    
+    enum { MaxIterations = 10000, };
+    enum { MoveType_H = 2, };
+    int moveType = MoveType_H;
+    // We will limit iterations here for demo purposes.
+    // Do limited number of iterations.
+    while (moveType < MaxIterations)
+    {
+        State::Wall built;
+        std::vector<State::Wall> removed;
+        std::cout << "calling Play..." <<std::endl;
+        StepH stepH = hunter.Play(state, &built, &removed);
+        stepH.wallCreateFlag = StepH::WallCreate_None;
+        DoPly(stepH, &state);
+        StepP stepP = prey.NextStep(state);
+        DoPly(stepH, stepP, &state);
+        
+        UpdateVis(state, &vis);
+        ++moveType;
+    }
+    
+    // Vis will quit when it receives an empty line.
+    vis.WriteStdin(std::string("\r\n"));
+    vis.Join();
+    
+    if (PreyCaptured(state))
+    {
+        std::cout << "Prey captured at time " << state.simTime << "." << std::endl;
+    }
+    else
+    {
+        std::cout << "Timed out at time " << state.simTime << "." << std::endl;
+    }
 }
 
 }
