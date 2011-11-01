@@ -93,7 +93,7 @@ TEST(evasion_game, RandomStrategy)
   int moveType = MoveType_H;
   // We will limit iterations here for demo purposes.
   // Do limited number of iterations.
-  while (moveType < MaxIterations)
+  while (!PreyCaptured(state) && (moveType < MaxIterations))
   {
     int dueTime;
     const bool makeWallLocked = (WallCreationLockedOut(state, &dueTime));
