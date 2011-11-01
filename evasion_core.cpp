@@ -80,7 +80,7 @@ State::State()
   board(Vector2<int>(0, 0), Vector2<int>(BoardSizeX - 1, BoardSizeY - 1)),
   wallCreatePeriod(0),
   maxWalls(0),
-  preyCaptureInfo(std::make_pair(Prey_Evading, 0))
+  preyCaptureInfo(std::make_pair(Prey_Evading, Prey_CaptureSimTimeInit))
 {}
 
 namespace detail
@@ -93,7 +93,7 @@ struct WallClipHelper
   typedef State::Wall Wall;
   typedef State::WallList WallList;
 
-  template <int WallDirection>
+  template <int Direction>
   struct CoordHelper;
 
   /// <summary> Coordinate helper for horizontal wall clipping. </summary>
@@ -180,7 +180,7 @@ struct WallClipHelper
 /// <remarks>
 ///   <para> Apply the motion info direction to the position. In the case of a
 ///     player that can move freely, the direction field must be updated for
-///     the curren time step prior to applying this function.
+///     the current time step prior to applying this function.
 ///   </para>
 /// </remarks>
 void MovePlayer(const State::Board& board, const State::WallList& walls,
@@ -215,13 +215,17 @@ void MovePlayer(const State::Board& board, const State::WallList& walls,
     if (State::Wall::Type_Horizontal == wall->type)
     {
       typedef WallClipHelper<State::Wall::Type_Horizontal> CollisionHelper;
-      hitWallH |= CollisionHelper::CheckCollision(wall->coords, posNewV);
+      const State::Wall::Coordinates coords = wall->coords;
+      hitWallH |= CollisionHelper::CheckCollision(coords, posNewV);
+      hitWallH |= (coords.p0 == posNew) || (coords.p1 == posNew);
     }
     else
     {
       assert(State::Wall::Type_Vertical == wall->type);
       typedef WallClipHelper<State::Wall::Type_Vertical> CollisionHelper;
-      hitWallV |= CollisionHelper::CheckCollision(wall->coords, posNewH);
+      const State::Wall::Coordinates coords = wall->coords;
+      hitWallV |= CollisionHelper::CheckCollision(coords, posNewH);
+      hitWallV |= (coords.p0 == posNew) || (coords.p1 == posNew);
     }
   }
   // Perform reflection. Bounce off of wall type.
@@ -412,7 +416,42 @@ void UndoPly(const StepH& stepH, State* state)
 PlyError DoPly(const StepH& stepH, const StepP& stepP, State* state)
 {
   assert(state);
-  return PlyError(PlyError::Success);
+  // Move H first since he needs to know where P is when creating walls.
+  PlyError err = detail::DoStepH(stepH,  state);
+  if (PlyError::Success == err)
+  {
+    ++state->simTime;
+    // Move P second. He may bounce off of a new wall!
+    state->motionP.d = stepP.moveDir;
+    detail::MovePlayer(state->board, state->walls,
+                       state->motionP, &state->motionP);
+    state->motionP.d = State::Direction(0, 0);
+    const int distHtoPSq = Vector2LengthSq(state->motionH.s - state->motionP.s);
+    const float distHtoP = sqrt(static_cast<float>(distHtoPSq));
+    if ((static_cast<int>(distHtoP) < HCatchesPDist) &&
+        (State::Prey_Evading == state->preyCaptureInfo.first))
+    {
+      state->preyCaptureInfo.first = State::Prey_Captured;
+      state->preyCaptureInfo.second = state->simTime;
+    }
+  }
+  return err;
+}
+
+void UndoPly(const StepH& stepH, const StepP& stepP, State* state)
+{
+  assert(state);
+  if (state->simTime == state->preyCaptureInfo.second)
+  {
+    state->preyCaptureInfo.first = State::Prey_Evading;
+    state->preyCaptureInfo.second = State::Prey_CaptureSimTimeInit;
+  }
+  state->motionP.d = -stepP.moveDir;
+  detail::MovePlayer(state->board, state->walls,
+                     state->motionH, &state->motionH);
+  state->motionP.d = State::Direction(0, 0);
+  detail::UndoStepH(stepH,  state);
+  --state->simTime;
 }
 
 }

@@ -13,6 +13,7 @@ namespace evasion
 
 enum { BoardSizeX = 500, };
 enum { BoardSizeY = 500, };
+enum { HCatchesPDist = 4, };
 
 /// <summary> Groups the constant values for the Prey initial position. </summary>
 struct PInitialPosition
@@ -68,7 +69,7 @@ struct State
   /// <summary> A list of walls. </summary>
   typedef std::vector<Wall> WallList;
   /// <summary> State of the prey. </summary>
-  enum Prey_State { Prey_Evading, Prey_Captured, };
+  enum Prey_State { Prey_CaptureSimTimeInit = -1, Prey_Evading, Prey_Captured, };
   /// <summary> Motion given by position and velocity direction. </summary>
   struct MotionInfo
   {
