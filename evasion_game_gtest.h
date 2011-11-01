@@ -92,7 +92,7 @@ TEST(evasion_game, RandomStrategy)
   enum { MoveType_H = 2, };
   int moveType = MoveType_H;
   // The Hunter cannot win. We will limit iterations here for demo purposes.
-  while (!PreyCaptured(state))
+  while (!PreyCaptured(state) && moveType < 100)
   {
     if (0 == (moveType % MoveType_H))
     {
