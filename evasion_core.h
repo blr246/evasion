@@ -15,21 +15,25 @@ enum { BoardSizeX = 500, };
 enum { BoardSizeY = 500, };
 enum { HCatchesPDist = 4, };
 
-/// <summary> Groups the constant values for the Prey initial position. </summary>
-struct PInitialPosition
+/// <summary> Groups the constant values for the initial position. </summary>
+struct InitialPosition
 {
-  enum { X = 330, };
-  enum { Y = 200, };
+  struct Hunter
+  {
+    enum { X = 0, };
+    enum { Y = 0, };
+  private:
+    Hunter();
+  };
+  struct Prey
+  {
+    enum { X = 330, };
+    enum { Y = 200, };
+  private:
+    Prey();
+  };
 private:
-  PInitialPosition();
-};
-/// <summary> Groups the constant values for the Hunter initial position. </summary>
-struct HInitialPosition
-{
-  enum { X = 0, };
-  enum { Y = 0, };
-private:
-  HInitialPosition();
+  InitialPosition();
 };
 
 /// <summary> The environment state. </summary>
@@ -69,17 +73,27 @@ struct State
   /// <summary> A list of walls. </summary>
   typedef std::vector<Wall> WallList;
   /// <summary> State of the prey. </summary>
-  enum Prey_State { Prey_CaptureSimTimeInit = -1, Prey_Evading, Prey_Captured, };
+  enum PreyState { PreyState_Evading, PreyState_Captured, };
   /// <summary> Motion given by position and velocity direction. </summary>
-  struct MotionInfo
+  struct HunterMotionInfo
   {
-    MotionInfo();
-    MotionInfo(const Position& s_, const Direction& d_);
-    /// <summary> Position s(t) as in physics. </summary>
-    Position s;
-    /// <summary> Unit direction of travel. </summary>
-    Direction d;
+    enum { Flag_NotStuck = 0, };
+    HunterMotionInfo()
+      : pos(InitialPosition::Hunter::X, InitialPosition::Hunter::Y),
+        dir(1, 1),
+        simTimeStuck(Flag_NotStuck)
+    {}
+    /// <summary> Position of hunter. </summary>
+    Position pos;
+    /// <summary> Hunter's unit direction of travel. </summary>
+    Direction dir;
+    /// <summary> Sim time when hunter became stuck. </summary>
+    int simTimeStuck;
   };
+  /// <summary> Position frames to pre-allocate for P. </summary>
+  enum { PosStackPrealloc = 4096, };
+  /// <summary> Memory of prey positions. </sumamry>
+  typedef std::vector<Position> PositionStack;
 
   State();
 
@@ -87,10 +101,10 @@ struct State
   int simTime;
   /// <summary> Time of the last wall create event. </summary>
   int simTimeLastWall;
-  /// <summary> Motion of P. </summary>
-  MotionInfo motionP;
+  /// <summary> Position of P. </summary>
+  PositionStack posStackP;
   /// <summary> Motion of H. </summary>
-  MotionInfo motionH;
+  HunterMotionInfo motionH;
   /// <summary> List of walls created by H. </summary>
   WallList walls;
   /// <summary> The game board. </summary>
@@ -99,8 +113,8 @@ struct State
   int wallCreatePeriod;
   /// <summary> Max walls created by H. </summary>
   int maxWalls;
-  /// <summary> Records a prey capture event. </sumamry>
-  std::pair<Prey_State, int> preyCaptureInfo;
+  /// <summary> State of the prey. </sumamry>
+  PreyState preyState;
 };
 
 /// <summary> Data used for H to move one step. </summary>
@@ -134,7 +148,7 @@ struct PlyError
   enum
   {
     // Success is mutually exclusive to all other flags. Check value directly.
-    Success,
+    Success                = 0,
     // Passed a wall to remove that does not exist.
     RemoveWallNotExist     = 1 << 0,
     // Tried to create a wall during the wall creation lockout.
@@ -143,10 +157,11 @@ struct PlyError
     MaxWallsExceeded       = 1 << 2,
     // Tried to create a wall but P is in the way.
     WallCreateInterference = 1 << 3,
-    // The player is not allowed to move.
-    PlayerIncapacitated    = 1 << 4,
+    // The game is over.
+    PreyCaptured           = 1 << 4,
   };
-  explicit PlyError(const int e_) : e(e_) {};
+  PlyError() : e(Success) {}
+  explicit PlyError(const int e_) : e(e_) {}
   inline operator int&()
   {
     return e;
@@ -193,9 +208,9 @@ PlyError DoPly(const StepH& stepH, const StepP& stepP, State* state);
 void UndoPly(const StepH& stepH, const StepP& stepP, State* state);
 
 /// <summary> Check if the prey is captured. </summary>
-inline bool GameOver(const State& state)
+inline bool PreyCaptured(const State& state)
 {
-  return State::Prey_Captured == state.preyCaptureInfo.first;
+  return State::PreyState_Captured == state.preyState;
 }
 
 /// <summary> Check if wall creation is locked out and return the time interval

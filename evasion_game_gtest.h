@@ -37,8 +37,8 @@ inline void UpdateVis(const State& state, Process* vis)
 {
   assert(vis);
   std::stringstream ssUpdate;
-  const State::Position posP = state.motionP.s;
-  const State::Position posH = state.motionH.s;
+  const State::Position posP = state.posStackP.back();
+  const State::Position posH = state.motionH.pos;
   ssUpdate
     << "<EvasionVis.GameUpdate>"
     <<   "<PosP>(" << posP.x << ", " << posP.y << ")</PosP>"

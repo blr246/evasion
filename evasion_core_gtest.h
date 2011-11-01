@@ -9,23 +9,23 @@ namespace hps
 namespace evasion
 {
 /// <summary> An equality operator for State testing. </summary>
-inline bool operator==(const State::MotionInfo& lhs,
-                       const State::MotionInfo& rhs)
+inline bool operator==(const State::HunterMotionInfo& lhs,
+                       const State::HunterMotionInfo& rhs)
 {
-  return (lhs.s == rhs.s) && (lhs.d == rhs.d);
+  return (lhs.pos == rhs.pos) && (lhs.dir == rhs.dir);
 }
 /// <summary> An equality operator for State testing. </summary>
 inline bool operator==(const State& lhs, const State& rhs)
 {
   return (lhs.simTime == rhs.simTime) &&
          (lhs.simTimeLastWall == rhs.simTimeLastWall) &&
-         (lhs.motionP == rhs.motionP) &&
+         (lhs.posStackP == rhs.posStackP) &&
          (lhs.motionH == rhs.motionH) &&
          (lhs.walls == rhs.walls) &&
          (lhs.board == rhs.board) &&
          (lhs.wallCreatePeriod == rhs.wallCreatePeriod) &&
          (lhs.maxWalls == rhs.maxWalls) &&
-         (lhs.preyCaptureInfo == rhs.preyCaptureInfo);
+         (lhs.preyState == rhs.preyState);
 }
 }
 }
@@ -39,14 +39,17 @@ TEST(evasion_core, CoreObject)
   {
     SCOPED_TRACE("State");
     State state;
-    EXPECT_EQ(State::Position(HInitialPosition::X, HInitialPosition::Y), state.motionH.s);
-    EXPECT_EQ(State::Direction(1, 1), state.motionH.d);
-    EXPECT_EQ(State::Position(PInitialPosition::X, PInitialPosition::Y), state.motionP.s);
-    EXPECT_EQ(State::Direction(0, 0), state.motionP.d);
+    EXPECT_EQ(State::Position(InitialPosition::Hunter::X,
+                              InitialPosition::Hunter::Y), state.motionH.pos);
+    EXPECT_EQ(State::Direction(1, 1), state.motionH.dir);
+    EXPECT_EQ(State::HunterMotionInfo::Flag_NotStuck, state.motionH.simTimeStuck);
+    EXPECT_EQ(State::Position(InitialPosition::Prey::X,
+                              InitialPosition::Prey::Y), state.posStackP.back());
     EXPECT_EQ(Vector2<int>(0, 0), state.board.mins);
     EXPECT_EQ(Vector2<int>(BoardSizeX - 1, BoardSizeY - 1), state.board.maxs);
     EXPECT_EQ(0, state.simTime);
     EXPECT_TRUE(state.walls.empty());
+    EXPECT_EQ(State::PreyState_Evading, state.preyState);
   }
 }
 
@@ -67,7 +70,7 @@ void PlyHSingleWallTestAllDir(const State::Wall& hit, const bool isBorder)
     state.walls.push_back(hit);
   }
   // Place H at center of wall and find in bounds coordinate.
-  State::Position& posH = state.motionH.s;
+  State::Position& posH = state.motionH.pos;
   posH = (hit.coords.p0 + hit.coords.p1) / 2;
   if (State::Wall::Type_Horizontal == hit.type)
   {
@@ -106,10 +109,10 @@ void PlyHSingleWallTestAllDir(const State::Wall& hit, const bool isBorder)
   for (int dirIdx = 0; dirIdx < NumDirs; ++dirIdx)
   {
     // Set direction.
-    state.motionH.d = s_dirs[dirIdx];
+    state.motionH.dir = s_dirs[dirIdx];
     const State beforePly = state;
     // Find reflection mask.
-    const State::Position nextPos = state.motionH.s + state.motionH.d;
+    const State::Position nextPos = state.motionH.pos + state.motionH.dir;
     Vector2<int> reflectMask(1, 1);
     if ((State::Wall::Type_Horizontal == hit.type) &&
         (nextPos.y == hit.coords.p0.y) &&
@@ -123,16 +126,17 @@ void PlyHSingleWallTestAllDir(const State::Wall& hit, const bool isBorder)
     {
       reflectMask.x = -1; // Hits a horizontal wall -> vertical bounce
     }
-    const State::Direction reflectDir(reflectMask.x * state.motionH.d.x,
-                                      reflectMask.y * state.motionH.d.y);
-    const State::Direction offset(reflectMask.x > 0 ? state.motionH.d.x : 0,
-                                  reflectMask.y > 0 ? state.motionH.d.y : 0);
-    const State::Position expectPos = state.motionH.s + offset;
+    const State::Direction reflectDir(reflectMask.x * state.motionH.dir.x,
+                                      reflectMask.y * state.motionH.dir.y);
+    const State::Direction offset(reflectMask.x > 0 ? state.motionH.dir.x : 0,
+                                  reflectMask.y > 0 ? state.motionH.dir.y : 0);
+    const State::Position expectPos = state.motionH.pos + offset;
     PlyError err = DoPly(emptyStep, &state);
     EXPECT_EQ(PlyError::Success, err);
-    EXPECT_EQ(expectPos, state.motionH.s);
-    EXPECT_EQ(reflectDir, state.motionH.d);
+    EXPECT_EQ(expectPos, state.motionH.pos);
+    EXPECT_EQ(reflectDir, state.motionH.dir);
     EXPECT_EQ(beforePly.simTime + 1, state.simTime);
+    EXPECT_EQ(State::HunterMotionInfo::Flag_NotStuck, state.motionH.simTimeStuck);
     UndoPly(emptyStep, &state);
     EXPECT_EQ(beforePly, state);
   }
@@ -148,8 +152,9 @@ TEST(evasion_core, PlyH)
     StepH emptyStep;
     PlyError err = DoPly(emptyStep, &state);
     EXPECT_EQ(PlyError::Success, err);
-    EXPECT_EQ(beforePly.motionH.s + beforePly.motionH.d, state.motionH.s);
-    EXPECT_EQ(beforePly.motionH.d, state.motionH.d);
+    EXPECT_EQ(beforePly.motionH.pos + beforePly.motionH.dir, state.motionH.pos);
+    EXPECT_EQ(beforePly.motionH.dir, state.motionH.dir);
+    EXPECT_EQ(State::HunterMotionInfo::Flag_NotStuck, state.motionH.simTimeStuck);
     EXPECT_EQ(beforePly.simTime + 1, state.simTime);
     UndoPly(emptyStep, &state);
     EXPECT_EQ(beforePly, state);
@@ -209,14 +214,14 @@ TEST(evasion_core, PlyH)
     SCOPED_TRACE("H - Collision with board corner");
     State state;
     Initialize(3, 3, &state);
-    state.motionH.d = State::Direction(1, 1);
-    state.motionH.s = state.board.maxs;
+    state.motionH.dir = State::Direction(1, 1);
+    state.motionH.pos = state.board.maxs;
     const State beforePly = state;
     StepH emptyStep;
     PlyError err = DoPly(emptyStep, &state);
     EXPECT_EQ(PlyError::Success, err);
-    EXPECT_EQ(beforePly.motionH.s, state.motionH.s);
-    EXPECT_EQ(-beforePly.motionH.d, state.motionH.d);
+    EXPECT_EQ(beforePly.motionH.pos, state.motionH.pos);
+    EXPECT_EQ(-beforePly.motionH.dir, state.motionH.dir);
     EXPECT_EQ(beforePly.simTime + 1, state.simTime);
     UndoPly(emptyStep, &state);
     EXPECT_EQ(beforePly, state);
@@ -232,7 +237,7 @@ TEST(evasion_core, PlyH)
     // Place vertical wall.
     state.walls.push_back(State::Wall());
     {
-      const int wallX = state.motionH.s.x + 1;
+      const int wallX = state.motionH.pos.x + 1;
       typedef State::Wall::Coordinates Coords;
       typedef State::Position Pos;
       State::Wall& wall = state.walls.back();
@@ -245,7 +250,7 @@ TEST(evasion_core, PlyH)
     // Place horizontal wall.
     state.walls.push_back(State::Wall());
     {
-      const int wallY = state.motionH.s.y + 1;
+      const int wallY = state.motionH.pos.y + 1;
       typedef State::Wall::Coordinates Coords;
       typedef State::Position Pos;
       State::Wall& wall = state.walls.back();
@@ -258,8 +263,8 @@ TEST(evasion_core, PlyH)
     const State beforePly = state;
     PlyError err = DoPly(emptyStep, &state);
     EXPECT_EQ(PlyError::Success, err);
-    EXPECT_EQ(beforePly.motionH.s, state.motionH.s);
-    EXPECT_EQ(-beforePly.motionH.d, state.motionH.d);
+    EXPECT_EQ(beforePly.motionH.pos, state.motionH.pos);
+    EXPECT_EQ(-beforePly.motionH.dir, state.motionH.dir);
     EXPECT_EQ(beforePly.simTime + 1, state.simTime);
     UndoPly(emptyStep, &state);
     EXPECT_EQ(beforePly, state);
@@ -273,11 +278,11 @@ TEST(evasion_core, PlyH)
     // Move once to get space from left side.
     DoPly(emptyStep, &state);
     // Move to edge of board horizontally.
-    state.motionH.s.x = state.board.maxs.x;
+    state.motionH.pos.x = state.board.maxs.x;
     // Place horizontal wall.
     state.walls.push_back(State::Wall());
     {
-      const int wallY = state.motionH.s.y + 1;
+      const int wallY = state.motionH.pos.y + 1;
       typedef State::Wall::Coordinates Coords;
       typedef State::Position Pos;
       State::Wall& wall = state.walls.back();
@@ -290,8 +295,8 @@ TEST(evasion_core, PlyH)
     const State beforePly = state;
     PlyError err = DoPly(emptyStep, &state);
     EXPECT_EQ(PlyError::Success, err);
-    EXPECT_EQ(beforePly.motionH.s, state.motionH.s);
-    EXPECT_EQ(-beforePly.motionH.d, state.motionH.d);
+    EXPECT_EQ(beforePly.motionH.pos, state.motionH.pos);
+    EXPECT_EQ(-beforePly.motionH.dir, state.motionH.dir);
     EXPECT_EQ(beforePly.simTime + 1, state.simTime);
     UndoPly(emptyStep, &state);
     EXPECT_EQ(beforePly, state);

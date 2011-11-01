@@ -54,34 +54,31 @@ inline std::ostream& operator<<(std::ostream& strm, const PlyError err)
       detail::StreamFlagsPrependDelim<'|'>(flags, &strm);
       ssErr << "WallCreateInterference";
     }
-    if (PlyError::PlayerIncapacitated & err)
+    if (PlyError::PreyCaptured & err)
     {
       detail::StreamFlagsPrependDelim<'|'>(flags, &strm);
-      ssErr << "PlayerIncapacitated";
+      ssErr << "PreyCaptured";
     }
     strm << ssErr.str();
   }
   return strm;
 }
 
-State::MotionInfo::MotionInfo() : s(), d() {}
-
-State::MotionInfo::MotionInfo(const Position& s_, const Direction& d_)
-: s(s_),
-  d(d_)
-{}
-
 State::State()
 : simTime(0),
   simTimeLastWall(0),
-  motionP(Position(PInitialPosition::X, PInitialPosition::Y), Direction(0, 0)),
-  motionH(Position(HInitialPosition::X, HInitialPosition::Y), Direction(1, 1)),
+  posStackP(),
+  motionH(),
   walls(),
   board(Vector2<int>(0, 0), Vector2<int>(BoardSizeX - 1, BoardSizeY - 1)),
   wallCreatePeriod(0),
   maxWalls(0),
-  preyCaptureInfo(std::make_pair(Prey_Evading, Prey_CaptureSimTimeInit))
-{}
+  preyState(PreyState_Evading)
+{
+  posStackP.reserve(PosStackPrealloc);
+  posStackP.push_back(Position(InitialPosition::Prey::X,
+                               InitialPosition::Prey::Y));
+}
 
 namespace detail
 {
@@ -127,7 +124,9 @@ struct WallClipHelper
   };
 
   /// <summary> Create a wall clipped by a list of existing walls. </summary>
-  static Wall CreateClipped(const Position& pt, const WallList& walls)
+  static Wall CreateClipped(const Position& pt,
+                            const WallList::const_iterator& first,
+                            const WallList::const_iterator& last)
   {
     typedef CoordHelper<WallDirection> CoordHelp;
     const int fixed = CoordHelp::GetFixed(pt);
@@ -138,9 +137,7 @@ struct WallClipHelper
     }
     WallCoordinates& wallCoords = wall.coords;
     // Clip wall using all perpendicular walls.
-    for (WallList::const_iterator clipW = walls.begin();
-         clipW != walls.end();
-         ++clipW)
+    for (WallList::const_iterator clipW = first; clipW != last; ++clipW)
     {
       const WallCoordinates& clipCoords = clipW->coords;
       if ((CoordHelp::OtherDirection == clipW->type) &&
@@ -182,18 +179,22 @@ struct WallClipHelper
 ///     player that can move freely, the direction field must be updated for
 ///     the current time step prior to applying this function.
 ///   </para>
+///   <para> Returns true only when the new position is reachable. </para>
 /// </remarks>
-void MovePlayer(const State::Board& board, const State::WallList& walls,
-                const State::MotionInfo& motion, State::MotionInfo* newMotion)
+bool MovePlayer(const State::Board& board,
+                const State::WallList::const_iterator& wallFirst,
+                const State::WallList::const_iterator& wallLast,
+                const State::Position& pos, const State::Direction& dir,
+                State::Position* newPos, State::Direction* newDir)
 {
-  assert(newMotion);
+  assert(newPos && newDir);
   // Nothing to do when player is stationary.
   static const State::Direction moveZero(0, 0);
-  if (moveZero == motion.d)
+  if (moveZero == dir)
   {
-    return;
+    return true;
   }
-  const State::Position posNew = motion.s + motion.d;
+  const State::Position posNew = pos + dir;
   bool hitWallH = false;
   bool hitWallV = false;
   // Check collision with board.
@@ -206,18 +207,18 @@ void MovePlayer(const State::Board& board, const State::WallList& walls,
     hitWallV = true;
   }
   // Check collision with all walls. Check directions independently.
-  const State::Position posNewV(motion.s.x, posNew.y); // Hits horizontal wall
-  const State::Position posNewH(posNew.x, motion.s.y); // Hits vertical wall
-  for (State::WallList::const_iterator wall = walls.begin();
-       wall != walls.end();
-       ++wall)
+  const State::Position posNewV(pos.x, posNew.y); // Hits horizontal wall
+  const State::Position posNewH(posNew.x, pos.y); // Hits vertical wall
+  bool moveInvalid = false;
+  for (State::WallList::const_iterator wall = wallFirst; wall != wallLast; ++wall)
   {
     if (State::Wall::Type_Horizontal == wall->type)
     {
       typedef WallClipHelper<State::Wall::Type_Horizontal> CollisionHelper;
       const State::Wall::Coordinates coords = wall->coords;
       hitWallH |= CollisionHelper::CheckCollision(coords, posNewV);
-      hitWallH |= (coords.p0 == posNew) || (coords.p1 == posNew);
+      hitWallH |= (coords.p0 == posNewV) || (coords.p1 == posNewV);
+      moveInvalid |= !hitWallH && CollisionHelper::CheckCollision(wall->coords, posNew);
     }
     else
     {
@@ -225,21 +226,30 @@ void MovePlayer(const State::Board& board, const State::WallList& walls,
       typedef WallClipHelper<State::Wall::Type_Vertical> CollisionHelper;
       const State::Wall::Coordinates coords = wall->coords;
       hitWallV |= CollisionHelper::CheckCollision(coords, posNewH);
-      hitWallV |= (coords.p0 == posNew) || (coords.p1 == posNew);
+      hitWallV |= (coords.p0 == posNewH) || (coords.p1 == posNewH);
+      moveInvalid |= !hitWallV && CollisionHelper::CheckCollision(wall->coords, posNew);
     }
   }
-  // Perform reflection. Bounce off of wall type.
-  if (hitWallH)
+  if (!moveInvalid)
   {
-    newMotion->d.y *= -1;
+    // Perform reflection. Bounce off of wall type.
+    *newDir = dir;
+    if (hitWallH)
+    {
+      newDir->y *= -1;
+    }
+    if (hitWallV)
+    {
+      newDir->x *= -1;
+    }
+    // Move player. Do not advance reflected coordinates.
+    *newPos = pos + State::Direction(!hitWallV * dir.x, !hitWallH * dir.y);
+    return true;
   }
-  if (hitWallV)
+  else
   {
-    newMotion->d.x *= -1;
+    return false;
   }
-  // Move player. Do not advance reflected coordinates.
-  newMotion->s += State::Direction(!hitWallV * motion.d.x,
-                                   !hitWallH * motion.d.y);
 }
 /// <summary> Internal helper function to apply an H step. </summary>
 PlyError DoStepH(const StepH& step, State* state)
@@ -250,84 +260,42 @@ PlyError DoStepH(const StepH& step, State* state)
   State::Wall wall;
   wall.simTimeCreate = state->simTime;
   const int numWalls = static_cast<int>(walls.size());
-  // Get player's new position.
-  State::MotionInfo motionHNew = state->motionH;
-  MovePlayer(state->board, state->walls, state->motionH, &motionHNew);
-  // See if wall creation requested and allowed.
-  const bool wantCreateWall = StepH::WallCreate_None != step.wallCreateFlag;
-  if (wantCreateWall)
-  {
-    // See if wall creation is legal.
-    int simTimeUntilWallCreate;
-    if (WallCreationLockedOut(*state, &simTimeUntilWallCreate))
-    {
-      std::cerr << "DoStepH() : "
-                << "Wall creation attempted during lockout." << std::endl;
-      err |= PlyError::WallCreationLockedOut;
-    }
-    else
-    {
-      // See if wall will intersect P by first creating the wall.
-      const State::Position& posH = state->motionH.s;
-      const State::Position& posP = state->motionP.s;
-      if (StepH::WallCreate_Horizontal == step.wallCreateFlag)
-      {
-        typedef WallClipHelper<State::Wall::Type_Horizontal> WallClipCreator;
-        assert(StepH::WallCreate_Horizontal == step.wallCreateFlag);
-        wall = WallClipCreator::CreateClipped(posH, walls);
-        assert(State::Wall::Type_Horizontal == wall.type);
-        // Check interference.
-        if (WallClipCreator::CheckCollision(wall.coords, posP))
-        {
-          std::cerr << "DoStepH() : Creation of horizontal wall cannot proceed "
-                    << "since P is in the way." << std::endl;
-          err |= PlyError::WallCreateInterference;
-        }
-        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.s))
-        {
-          std::cerr << "DoStepH() : Creation of horizontal wall cannot proceed "
-                    << "since H moves in the way." << std::endl;
-          err |= PlyError::WallCreateInterference;
-        }
-      }
-      else
-      {
-        typedef WallClipHelper<State::Wall::Type_Vertical> WallClipCreator;
-        assert(StepH::WallCreate_Vertical == step.wallCreateFlag);
-        wall = WallClipCreator::CreateClipped(posH, walls);
-        assert(State::Wall::Type_Vertical == wall.type);
-        // Check interference.
-        if (WallClipCreator::CheckCollision(wall.coords, posP))
-        {
-          std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
-                    << "since P is in the way." << std::endl;
-          err |= PlyError::WallCreateInterference;
-        }
-        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.s))
-        {
-          std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
-                    << "since H moves in the way." << std::endl;
-          err |= PlyError::WallCreateInterference;
-        }
-      }
-    }
-  }
+  // Record if Hunter is stuck.
+  const bool stuckBefore = (state->motionH.simTimeStuck !=
+                            State::HunterMotionInfo::Flag_NotStuck);
+  bool unstuck = false;
   // See if wall removals are valid. Use walls as temporary storage.
+  // Copy walls to itself for temporary storage.
+  walls.resize(2 * numWalls);
+  std::copy(walls.begin(), walls.begin() + numWalls, walls.begin() + numWalls);
   const bool wantRemoveWall = !step.removeWalls.empty();
   if (wantRemoveWall)
   {
-    // Copy walls to itself for temporary storage.
     typedef State::WallList::iterator WallRemovePos;
-    walls.resize(2 * numWalls);
-    WallRemovePos wallsCopyBegin = walls.begin() + numWalls;
-    std::copy(walls.begin(), wallsCopyBegin, wallsCopyBegin);
     // Remove walls from the copied range.
+    const State::Position& posH = state->motionH.pos;
     const State::WallList& removeWalls = step.removeWalls;
     for (State::WallList::const_iterator rmWall = removeWalls.begin();
          rmWall != removeWalls.end();
          ++rmWall)
     {
-      WallRemovePos rmPos = std::remove(wallsCopyBegin, walls.end(), *rmWall);
+      WallRemovePos rmPos = std::remove(walls.begin() + numWalls,
+                                        walls.end(), *rmWall);
+      // See if we are unstuck by a wall removal.
+      if (stuckBefore && !unstuck)
+      {
+        if (State::Wall::Type_Horizontal == rmWall->type)
+        {
+          typedef WallClipHelper<State::Wall::Type_Horizontal> WallClipepr;
+          unstuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+        }
+        else
+        {
+          assert(State::Wall::Type_Vertical == rmWall->type);
+          typedef WallClipHelper<State::Wall::Type_Vertical> WallClipepr;
+          unstuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+        }
+      }
       // Remove wall is valid?
       if (walls.end() != rmPos)
       {
@@ -343,17 +311,95 @@ PlyError DoStepH(const StepH& step, State* state)
       }
     }
   }
+  // Get Hunter's new position.
+  State::HunterMotionInfo motionHNew;
+  if (!stuckBefore || unstuck)
+  {
+     const bool stuckNow = !MovePlayer(state->board,
+                                       walls.begin() + numWalls, walls.end(),
+                                       state->motionH.pos, state->motionH.dir,
+                                       &motionHNew.pos, &motionHNew.dir);
+     if (stuckNow)
+     {
+       motionHNew.simTimeStuck = state->simTime + 1;
+     }
+  }
+  else
+  {
+    motionHNew = state->motionH;
+  }
+  // See if wall creation requested and allowed. Use walls modified by removals.
+  const bool wantCreateWall = StepH::WallCreate_None != step.wallCreateFlag;
+  if (wantCreateWall)
+  {
+    // See if wall creation is legal.
+    int simTimeUntilWallCreate;
+    if (WallCreationLockedOut(*state, &simTimeUntilWallCreate))
+    {
+      std::cerr << "DoStepH() : "
+                << "Wall creation attempted during lockout." << std::endl;
+      err |= PlyError::WallCreationLockedOut;
+    }
+    // Check wall creations.
+    {
+      // See if wall will intersect P by first creating the wall.
+      const State::Position& posH = state->motionH.pos;
+      const State::Position& posP = state->posStackP.back();
+      if (StepH::WallCreate_Horizontal == step.wallCreateFlag)
+      {
+        typedef WallClipHelper<State::Wall::Type_Horizontal> WallClipCreator;
+        assert(StepH::WallCreate_Horizontal == step.wallCreateFlag);
+        wall = WallClipCreator::CreateClipped(posH, walls.begin() + numWalls,
+                                              walls.end());
+        assert(State::Wall::Type_Horizontal == wall.type);
+        // Check interference.
+        if (WallClipCreator::CheckCollision(wall.coords, posP))
+        {
+          std::cerr << "DoStepH() : Creation of horizontal wall cannot proceed "
+                    << "since P is in the way." << std::endl;
+          err |= PlyError::WallCreateInterference;
+        }
+        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.pos))
+        {
+          std::cerr << "DoStepH() : Creation of horizontal wall cannot proceed "
+                    << "since H moves in the way." << std::endl;
+          err |= PlyError::WallCreateInterference;
+        }
+      }
+      else
+      {
+        typedef WallClipHelper<State::Wall::Type_Vertical> WallClipCreator;
+        assert(StepH::WallCreate_Vertical == step.wallCreateFlag);
+        wall = WallClipCreator::CreateClipped(posH, walls.begin() + numWalls,
+                                              walls.end());
+        assert(State::Wall::Type_Vertical == wall.type);
+        // Check interference.
+        if (WallClipCreator::CheckCollision(wall.coords, posP))
+        {
+          std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
+                    << "since P is in the way." << std::endl;
+          err |= PlyError::WallCreateInterference;
+        }
+        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.pos))
+        {
+          std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
+                    << "since H moves in the way." << std::endl;
+          err |= PlyError::WallCreateInterference;
+        }
+      }
+    }
+  }
   // If there were no errors, then remove the walls, add new walls, advance H,
   // and check for collisions.
   if (PlyError::Success == err)
   {
+    const int wallsNow = numWalls - static_cast<int>(step.removeWalls.size());
     if (wantRemoveWall)
     {
-      const int wallsNow = numWalls - static_cast<int>(step.removeWalls.size());
       std::copy(walls.begin() + numWalls, walls.end(), walls.begin());
-      walls.resize(wallsNow);
-      std::make_heap(walls.begin(), walls.end(), State::Wall::Sort());
+      std::make_heap(walls.begin(), walls.begin() + wallsNow, State::Wall::Sort());
     }
+    walls.resize(wallsNow);
     if (wantCreateWall)
     {
       walls.push_back(wall);
@@ -373,10 +419,21 @@ PlyError DoStepH(const StepH& step, State* state)
 inline void UndoStepH(const StepH& step, State* state)
 {
   State::WallList& walls = state->walls;
-  // Undo H motion. Need to move twice to fix collisions.
-  state->motionH.d *= -1;
-  MovePlayer(state->board, state->walls, state->motionH, &state->motionH);
-  state->motionH.d *= -1;
+  // Undo H motion if he isnt stuck.
+  if (state->motionH.simTimeStuck == state->simTime)
+  {
+    state->motionH.simTimeStuck = State::HunterMotionInfo::Flag_NotStuck;
+  }
+  typedef State::HunterMotionInfo HunterMotionInfo;
+  bool stuck = HunterMotionInfo::Flag_NotStuck != state->motionH.simTimeStuck;
+  if (!stuck)
+  {
+    state->motionH.dir *= -1;
+    MovePlayer(state->board, state->walls.begin(), state->walls.end(),
+               state->motionH.pos, state->motionH.dir,
+               &state->motionH.pos, &state->motionH.dir);
+    state->motionH.dir *= -1;
+  }
   // Remove added wall (order maintained by sorting).
   if (StepH::WallCreate_None != step.wallCreateFlag)
   {
@@ -384,12 +441,45 @@ inline void UndoStepH(const StepH& step, State* state)
     walls.pop_back();
   }
   // Replace removed walls and maintain order.
+  const State::Position& posH = state->motionH.pos;
   for (State::WallList::const_iterator rmWall = step.removeWalls.begin();
        rmWall != step.removeWalls.end();
        ++rmWall)
   {
+    // Check if H was stuck.
+    if (!stuck)
+    {
+      if (State::Wall::Type_Horizontal == rmWall->type)
+      {
+        typedef WallClipHelper<State::Wall::Type_Horizontal> WallClipepr;
+        stuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+      }
+      else
+      {
+        assert(State::Wall::Type_Vertical == rmWall->type);
+        typedef WallClipHelper<State::Wall::Type_Vertical> WallClipepr;
+        stuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+      }
+    }
     walls.push_back(*rmWall);
     std::push_heap(walls.begin(), walls.end(), State::Wall::Sort());
+  }
+  if (stuck)
+  {
+    state->motionH.simTimeStuck = state->simTime - 1;
+  }
+}
+
+/// <summary> Try to capture the prey. </summary>
+void TryCapturePrey(State* state)
+{
+  assert(State::PreyState_Evading == state->preyState);
+  const State::Position vecHtoP = state->motionH.pos - state->posStackP.back();
+  const int distHtoPSq = Vector2LengthSq(vecHtoP);
+  const float distHtoP = sqrt(static_cast<float>(distHtoPSq));
+  if (static_cast<int>(distHtoP) < HCatchesPDist)
+  {
+    state->preyState = State::PreyState_Captured;
   }
 }
 }
@@ -397,10 +487,23 @@ inline void UndoStepH(const StepH& step, State* state)
 PlyError DoPly(const StepH& stepH, State* state)
 {
   assert(state);
-  PlyError err = detail::DoStepH(stepH,  state);
-  if (PlyError::Success == err)
+  // See if prey captured.
+  PlyError err;
+  if (PreyCaptured(*state))
   {
-    ++state->simTime;
+    std::cerr << "DoPly() : cannot advance Hunter-only ply since the prey is "
+              << "captured already." << std::endl;
+    err |= PlyError::PreyCaptured;
+  }
+  else
+  {
+    err |= detail::DoStepH(stepH, state);
+    if (PlyError::Success == err)
+    {
+      ++state->simTime;
+      // See if the prey is capture.
+      detail::TryCapturePrey(state);
+    }
   }
   return err;
 }
@@ -408,6 +511,9 @@ PlyError DoPly(const StepH& stepH, State* state)
 void UndoPly(const StepH& stepH, State* state)
 {
   assert(state);
+  // reissb -- 20111031 -- Since the game stops once the prey is captured, we
+  //   can just enforce that it is evading here.
+  state->preyState = State::PreyState_Evading;
   detail::UndoStepH(stepH,  state);
   --state->simTime;
   assert(state->simTime >= 0);
@@ -416,42 +522,57 @@ void UndoPly(const StepH& stepH, State* state)
 PlyError DoPly(const StepH& stepH, const StepP& stepP, State* state)
 {
   assert(state);
-  // Move H first since he needs to know where P is when creating walls.
-  PlyError err = detail::DoStepH(stepH,  state);
-  if (PlyError::Success == err)
+  // See if prey captured.
+  PlyError err;
+  if (PreyCaptured(*state))
   {
-    ++state->simTime;
-    // Move P second. He may bounce off of a new wall!
-    state->motionP.d = stepP.moveDir;
-    detail::MovePlayer(state->board, state->walls,
-                       state->motionP, &state->motionP);
-    state->motionP.d = State::Direction(0, 0);
-    const int distHtoPSq = Vector2LengthSq(state->motionH.s - state->motionP.s);
-    const float distHtoP = sqrt(static_cast<float>(distHtoPSq));
-    if ((static_cast<int>(distHtoP) < HCatchesPDist) &&
-        (State::Prey_Evading == state->preyCaptureInfo.first))
+    std::cerr << "DoPly() : cannot advance mixed Hunter-Prey ply since the "
+              << "prey is captured already." << std::endl;
+    err |= PlyError::PreyCaptured;
+  }
+  else
+  {
+    // Move H first since he needs to know where P is when creating walls.
+    err |= detail::DoStepH(stepH,  state);
+    if (PlyError::Success == err)
     {
-      state->preyCaptureInfo.first = State::Prey_Captured;
-      state->preyCaptureInfo.second = state->simTime;
+      ++state->simTime;
+      // Move P second. He may bounce off of a new wall, so we have to check
+      // the return code of MovePlayer().
+      State::Position newPosP;
+      State::Direction newDirP;
+      const bool validMove = detail::MovePlayer(state->board,
+                                                state->walls.begin(),
+                                                state->walls.end(),
+                                                state->posStackP.back(),
+                                                stepP.moveDir,
+                                                &newPosP, &newDirP);
+      if (validMove)
+      {
+        state->posStackP.push_back(newPosP);
+      }
+      else
+      {
+        state->posStackP.push_back(state->posStackP.back());
+      }
+      detail::TryCapturePrey(state);
     }
   }
   return err;
 }
 
-void UndoPly(const StepH& stepH, const StepP& stepP, State* state)
+void UndoPly(const StepH& stepH, const StepP& /*stepP*/, State* state)
 {
   assert(state);
-  if (state->simTime == state->preyCaptureInfo.second)
-  {
-    state->preyCaptureInfo.first = State::Prey_Evading;
-    state->preyCaptureInfo.second = State::Prey_CaptureSimTimeInit;
-  }
-  state->motionP.d = -stepP.moveDir;
-  detail::MovePlayer(state->board, state->walls,
-                     state->motionH, &state->motionH);
-  state->motionP.d = State::Direction(0, 0);
+  // reissb -- 20111031 -- Since the game stops once the prey is captured, we
+  //   can just enforce that it is evading here.
+  state->preyState = State::PreyState_Evading;
+  // Undo prey position.
+  state->posStackP.pop_back();
+  // Undo hunter's move.
   detail::UndoStepH(stepH,  state);
   --state->simTime;
+  assert(state->simTime >= 0);
 }
 
 }
