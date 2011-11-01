@@ -78,6 +78,42 @@ TEST(evasion_game, DemoVisTest)
   vis.Join();
 }
 
+TEST(evasion_game, NoStrategy)
+{
+  // Game state.
+  State state;
+
+  // Create a vis process.
+  Process vis;
+  InitializeVis(state, &vis);
+
+  // Send vis a new state. This is where you play the game.
+  enum { MoveType_H = 2, };
+  int moveType = MoveType_H;
+  // The Hunter cannot win. We will limit iterations here for demo purposes.
+  while (moveType < 1000)
+  {
+    if (0 == (moveType % MoveType_H))
+    {
+      StepH stepH;
+      DoPly(stepH, &state);
+    }
+    else
+    {
+      StepH stepH;
+      StepP stepP;
+      stepP.moveDir = State::Direction(0, 0);
+      DoPly(stepH, stepP, &state);
+    }
+    UpdateVis(state, &vis);
+    ++moveType;
+  }
+
+  // Vis will quit when it receives an empty line.
+  vis.WriteStdin(std::string("\r\n"));
+  vis.Join();
+}
+
 }
 
 #endif //_HPS_EVASION_EVASION_GAME_GTEST_H_

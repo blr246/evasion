@@ -192,6 +192,8 @@ bool MovePlayer(const State::Board& board,
   static const State::Direction moveZero(0, 0);
   if (moveZero == dir)
   {
+    *newDir = dir;
+    *newPos = pos;
     return true;
   }
   const State::Position posNew = pos + dir;
