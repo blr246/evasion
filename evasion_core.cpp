@@ -318,6 +318,22 @@ PlyError DoStepH(const StepH& step, State* state)
 inline void UndoStepH(const StepH& step, State* state)
 {
   State::WallList& walls = state->walls;
+  // Remove added wall since it will block reversing the motion.
+  // The wall order is maintained by sorting.
+  if (StepH::WallCreate_None != step.wallCreateFlag)
+  {
+    assert((state->simTime - 1) == walls.front().simTimeCreate);
+    std::pop_heap(walls.begin(), walls.end(), State::Wall::Sort());
+    walls.pop_back();
+    if (walls.empty())
+    {
+      state->simTimeLastWall = -state->wallCreatePeriod;
+    }
+    else
+    {
+      state->simTimeLastWall = walls.front().simTimeCreate;
+    }
+  }
   // Undo H motion if he isnt stuck.
   if (state->motionH.simTimeStuck == state->simTime)
   {
@@ -332,21 +348,6 @@ inline void UndoStepH(const StepH& step, State* state)
                state->motionH.pos, state->motionH.dir,
                &state->motionH.pos, &state->motionH.dir);
     state->motionH.dir *= -1;
-  }
-  // Remove added wall (order maintained by sorting).
-  if (StepH::WallCreate_None != step.wallCreateFlag)
-  {
-    std::pop_heap(walls.begin(), walls.end(), State::Wall::Sort());
-    walls.pop_back();
-    assert((state->simTime - 1) == walls.front().simTimeCreate);
-    if (walls.empty())
-    {
-      state->simTimeLastWall = -state->wallCreatePeriod;
-    }
-    else
-    {
-      state->simTimeLastWall = walls.front().simTimeCreate;
-    }
   }
   // Replace removed walls and maintain order.
   const State::Position& posH = state->motionH.pos;

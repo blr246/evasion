@@ -18,11 +18,16 @@ inline bool operator==(const State::HunterMotionInfo& lhs,
 /// <summary> An equality operator for State testing. </summary>
 inline bool operator==(const State& lhs, const State& rhs)
 {
+  // reissb -- 20111101 -- Have to sort walls before we compare.
+  State::WallList lhsWallsSorted = lhs.walls;
+  std::sort_heap(lhsWallsSorted.begin(), lhsWallsSorted.end(), State::Wall::Sort());
+  State::WallList rhsWallsSorted = rhs.walls;
+  std::sort_heap(rhsWallsSorted.begin(), rhsWallsSorted.end(), State::Wall::Sort());
   return (lhs.simTime == rhs.simTime) &&
          (lhs.simTimeLastWall == rhs.simTimeLastWall) &&
          (lhs.posStackP == rhs.posStackP) &&
          (lhs.motionH == rhs.motionH) &&
-         (lhs.walls == rhs.walls) &&
+         (lhsWallsSorted == rhsWallsSorted) &&
          (lhs.board == rhs.board) &&
          (lhs.wallCreatePeriod == rhs.wallCreatePeriod) &&
          (lhs.maxWalls == rhs.maxWalls) &&
@@ -320,7 +325,7 @@ void TestWallCreate(const bool alternateDir)
   enum { Dir1 = CoordHelper0::OtherDirection, };
   typedef evasion::detail::WallClipHelper<Dir1> CoordHelper1;
   enum { MaxWalls = 10, };
-  enum { MinCreatePeriod = 0, };
+  enum { MinCreatePeriod = 1, };
   enum { MaxCreatePeriod = 10, };
   const int numWalls = 1 + RandBound(MaxWalls);
   const int createPeriod = MinCreatePeriod + RandBound(MaxCreatePeriod - MinCreatePeriod + 1);
@@ -339,9 +344,10 @@ void TestWallCreate(const bool alternateDir)
   // Force P to be in an impossible location to prevent wall interference.
   state.posStackP.push_back(State::Position(BoardSizeX + HCatchesPDist,
                                             BoardSizeY + HCatchesPDist));
-  State::Position wallCreatePos;
+  State::Position wallCreatePosLast(-1, -1);
   for (int wallIdx = 0; wallIdx < state.maxWalls; ++wallIdx)
   {
+    EXPECT_EQ(moveType, state.simTime);
     // Create wall. Ignore case where P is in the way (we'll try not to let
     // that happen for this test).
     const int alternateId = alternateDir && (wallIdx % 2);
@@ -349,52 +355,75 @@ void TestWallCreate(const bool alternateDir)
     const int wallFixedCoord = (alternateId) ?
                                CoordHelper1::GetFixed(state.motionH.pos) :
                                CoordHelper0::GetFixed(state.motionH.pos);
-    wallCreatePos = state.motionH.pos;
+    State::Position wallCreatePosNow = state.motionH.pos;
     if (0 == (moveType % MoveType_H))
     {
+      const State stateBefore = state;
       EXPECT_EQ(PlyError::Success, DoPly(wallCreate, &state));
+      UndoPly(wallCreate, &state);
+      EXPECT_EQ(stateBefore, state);
+      DoPly(wallCreate, &state);
     }
     else
     {
+      const State stateBefore = state;
       EXPECT_EQ(PlyError::Success, DoPly(wallCreate, emptyP, &state));
+      UndoPly(wallCreate, emptyP, &state);
+      EXPECT_EQ(stateBefore, state);
+      DoPly(wallCreate, emptyP, &state);
     }
     EXPECT_EQ(state.simTime - 1, state.walls.front().simTimeCreate);
     // Clip coords when alternating.
     if (alternateDir)
     {
+      // Fixed coordinate is from H position at wall creation time.
+      // Clip coordinat is the previous wall plus one. The previous wall was
+      // created at the last created time.
       if (alternateId)
       {
         typedef CoordHelper1 CoordHelper;
         assert(&wallCreate == &wallCreate1);
-        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePos),
+        // Fixed.
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
                   CoordHelper::GetFixed(state.walls.front().coords.p0));
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
+                  CoordHelper::GetFixed(state.walls.front().coords.p1));
+        // Clip.
+        EXPECT_EQ(CoordHelper::GetClip(wallCreatePosLast) + 1,
+                  CoordHelper::GetClip(state.walls.front().coords.p0));
         EXPECT_EQ(CoordHelper::GetClip(state.board.maxs),
                   CoordHelper::GetClip(state.walls.front().coords.p1));
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p0), wallFixedCoord);
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p1), wallFixedCoord);
       }
       else
       {
         assert(&wallCreate == &wallCreate0);
         typedef CoordHelper0 CoordHelper;
-        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePos),
+        // Fixed.
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
+                  CoordHelper::GetFixed(state.walls.front().coords.p0));
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
+                  CoordHelper::GetFixed(state.walls.front().coords.p1));
+        // Clip.
+        EXPECT_EQ(CoordHelper::GetClip(wallCreatePosLast) + 1,
                   CoordHelper::GetClip(state.walls.front().coords.p0));
         EXPECT_EQ(CoordHelper::GetClip(state.board.maxs),
                   CoordHelper::GetClip(state.walls.front().coords.p1));
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p0), wallFixedCoord);
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p1), wallFixedCoord);
       }
     }
     else
     {
       assert(&wallCreate == &wallCreate0);
       typedef CoordHelper0 CoordHelper;
-      EXPECT_EQ(0, CoordHelper::GetClip(state.walls.front().coords.p0));
+      // Fixed.
+      EXPECT_EQ(wallFixedCoord, CoordHelper::GetFixed(state.walls.front().coords.p0));
+      EXPECT_EQ(wallFixedCoord, CoordHelper::GetFixed(state.walls.front().coords.p1));
+      // Clip.
+      EXPECT_EQ(CoordHelper::GetClip(state.board.mins),
+                CoordHelper::GetClip(state.walls.front().coords.p0));
       EXPECT_EQ(CoordHelper::GetClip(state.board.maxs),
                 CoordHelper::GetClip(state.walls.front().coords.p1));
-      EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p0), wallFixedCoord);
-      EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p1), wallFixedCoord);
     }
+    wallCreatePosLast = wallCreatePosNow;
     ++moveType;
     // Leave when walls maxed.
     if (wallIdx == (numWalls - 1))
@@ -419,12 +448,20 @@ void TestWallCreate(const bool alternateDir)
       if (0 == (moveType % MoveType_H))
       {
         EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, &state));
+        const State stateBefore = state;
         EXPECT_EQ(PlyError::Success, DoPly(emptyH, &state));
+        UndoPly(emptyH, &state);
+        EXPECT_EQ(stateBefore, state);
+        DoPly(emptyH, &state);
       }
       else
       {
         EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, emptyP, &state));
+        const State stateBefore = state;
         EXPECT_EQ(PlyError::Success, DoPly(emptyH, emptyP, &state));
+        UndoPly(emptyH, emptyP, &state);
+        EXPECT_EQ(stateBefore, state);
+        DoPly(emptyH, emptyP, &state);
       }
       ++moveType;
     }
@@ -456,22 +493,118 @@ TEST(evasion_core, CreateWall)
       TestWallCreate<State::Wall::Type_Vertical>(false);
     }
   }
-//  // Test alternating directions.
-//  {
-//    SCOPED_TRACE("Wall create - alternating starting with horizontal");
-//    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
-//    {
-//      TestWallCreate<State::Wall::Type_Horizontal>(true);
-//    }
-//  }
-//  // Test alternating directions.
-//  {
-//    SCOPED_TRACE("Wall create - alternating starting with vertical");
-//    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
-//    {
-//      TestWallCreate<State::Wall::Type_Vertical>(true);
-//    }
-//  }
+  // Test alternating directions.
+  {
+    SCOPED_TRACE("Wall create - alternating starting with horizontal");
+    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
+    {
+      TestWallCreate<State::Wall::Type_Horizontal>(true);
+    }
+  }
+  // Test alternating directions.
+  {
+    SCOPED_TRACE("Wall create - alternating starting with vertical");
+    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
+    {
+      TestWallCreate<State::Wall::Type_Vertical>(true);
+    }
+  }
+}
+
+TEST(evasion_core, RemoveWalls)
+{
+  // Create some walls, then remove a random number [1, N] and make sure that
+  // the state is reverisble.
+  State state;
+  Initialize(3, 3, &state);
+
+  enum { Iterations = 1000, };
+  enum { MoveType_H = 2, };
+  int moveType = MoveType_H;
+  // Force P to be in an impossible location to prevent wall interference.
+  state.posStackP.push_back(State::Position(BoardSizeX + HCatchesPDist,
+                                            BoardSizeY + HCatchesPDist));
+  // Do limited number of iterations.
+  while (moveType < Iterations)
+  {
+    int dueTime;
+    const bool makeWallLocked = (WallCreationLockedOut(state, &dueTime));
+    const bool noWalls = state.walls.empty();
+    enum { NWallMkProb = 50, };
+    enum { NWallRmProb = 200, };
+    // Make walls exclusively from removing them in this test.
+    const bool makeWall = !makeWallLocked && (0 == RandBound(NWallMkProb));
+    const bool rmWall = !noWalls && !makeWall && (0 == RandBound(NWallRmProb));
+    // First setup the move.
+    StepH stepH;
+    if (rmWall)
+    {
+      assert(!makeWall);
+      // Copy walls and random shuffle.
+      State::WallList walls = state.walls;
+      std::random_shuffle(walls.begin(), walls.end());
+      // Remove random wall(s).
+      const int rmCount = RandBound(walls.size()) + 1;
+      stepH.removeWalls.resize(rmCount);
+      std::copy(walls.begin(), walls.begin() + rmCount,
+                stepH.removeWalls.begin());
+    }
+    else
+    {
+      // Either make a wall or do nothing.
+      assert((makeWall && !rmWall) || (!makeWall && !rmWall));
+      if (makeWall)
+      {
+        const int wallType = RandBound(2);
+        if (0 == wallType)
+        {
+          stepH.wallCreateFlag = StepH::WallCreate_Horizontal;
+        }
+        else
+        {
+          stepH.wallCreateFlag = StepH::WallCreate_Vertical;
+        }
+      }
+    }
+    // Alternate between {H} and {H, P} moves.
+    if (0 == (moveType % MoveType_H))
+    {
+      if (rmWall)
+      {
+        // Remove the walls and make sure that the move is reversible.
+        const State stateBefore = state;
+        EXPECT_EQ(PlyError::Success, DoPly(stepH, &state));
+        UndoPly(stepH, &state);
+        EXPECT_EQ(stateBefore, state);
+        DoPly(stepH, &state);
+      }
+      else
+      {
+        // Making walls is tested separately. Just do it.
+        EXPECT_EQ(PlyError::Success, DoPly(stepH, &state));
+      }
+    }
+    else
+    {
+      StepP stepP;
+      stepP.moveDir = State::Direction(RandBound(3) - 1, RandBound(3) - 1);
+      if (rmWall)
+      {
+        // Remove the walls and make sure that the move is reversible.
+        const State stateBefore = state;
+        EXPECT_EQ(PlyError::Success, DoPly(stepH, stepP, &state));
+        UndoPly(stepH, stepP, &state);
+        EXPECT_EQ(stateBefore, state);
+        DoPly(stepH, stepP, &state);
+      }
+      else
+      {
+        // Making walls is tested separately. Just do it.
+        EXPECT_EQ(PlyError::Success, DoPly(stepH, stepP, &state));
+      }
+    }
+    ++moveType;
+  }
 }
 
 }
