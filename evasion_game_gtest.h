@@ -170,7 +170,7 @@ TEST(evasion_game, RandomStrategy)
     std::cout << "Timed out at time " << state.simTime << "." << std::endl;
   }
 }
-TEST(evasion_game, GreedyPreyRandomHunter)
+void TestPrey(Prey& prey, int MaxIterations)
 {
   // Game state.
   State state;
@@ -180,7 +180,6 @@ TEST(evasion_game, GreedyPreyRandomHunter)
   Process vis;
   InitializeVis(state, &vis);
 
-  enum { MaxIterations = 100, };
   enum { MoveType_H = 2, };
   int moveType = MoveType_H;
   // We will limit iterations here for demo purposes.
@@ -234,8 +233,7 @@ TEST(evasion_game, GreedyPreyRandomHunter)
     }
     else
     {
-      ScaredPrey p;
-      StepP stepP = p.NextStep(state);
+      StepP stepP = prey.NextStep(state);
       err = DoPly(stepH, stepP, &state);
     }
     // Do-over on case when the move does not succeed. This happens rarely when
@@ -260,6 +258,19 @@ TEST(evasion_game, GreedyPreyRandomHunter)
   {
     std::cout << "Timed out at time " << state.simTime << "." << std::endl;
   }
+}
+TEST(evasion_game, GreedyPreyRandomHunter)
+{
+  ScaredPrey p;
+  enum { MaxIterations = 100, };
+  TestPrey(p, MaxIterations);
+}
+
+TEST(evasion_game, ExtremePreyRandomHunter)
+{
+  ExtremePrey p;
+  enum { MaxIterations = 10000, };
+  TestPrey(p, MaxIterations);
 }
 
 }

@@ -25,7 +25,7 @@ struct RandomPrey{
   }
 };
 
-struct ScaredPrey{
+struct ScaredPrey : public Prey{ //Scared prey doesn't like walls (they might fall) or danger.
   StepP NextStep(State& state)
   {
     const State::Position& pPos = state.posStackP.back();
@@ -117,6 +117,61 @@ struct ScaredPrey{
 };
 
 
+struct ExtremePrey : public Prey{ //ExtremePrey likes danger.
+  StepP NextStep(State& state)
+  {
+    const State::Position& pPos = state.posStackP.back();
+    Vector2<float> FpPos = StaticCastVector2<int, float>(pPos);
+    const State::Position& hPos = state.motionH.pos;
+
+    StepP step;
+      
+    Line<float> HunterWall;
+    HunterWall.p0 = StaticCastVector2<int, float>(hPos);
+    HunterWall.dir = StaticCastVector2<int, float>(state.motionH.dir);
+
+    Vector2<float> point = ClosestPointInLine(HunterWall, FpPos);
+    int wallDist = Vector2LengthSq(point - FpPos);
+    std::cout << wallDist << std::endl;
+
+    int distX = FpPos.x - point.x;
+    int distY = FpPos.y - point.y;
+    if(wallDist > 5*5) // Approach the death machine!
+    {
+      distX = -1*distX;
+      distY = -1*distY;
+    }
+
+    if(distX > 0)
+    {
+      step.moveDir.x = 1; // Prey is to the left of the closest wall
+    }else if(distX == 0){
+      step.moveDir.x = 0;
+    }else{
+      step.moveDir.x = -1; // Prey is to the right of the closest wall
+    }
+    if(distY > 0)
+    {
+      step.moveDir.y = 1; // Prey is above the closest wall
+    }else if(distY == 0){
+      step.moveDir.y = 0;
+    }else{
+      step.moveDir.y = -1; // Prey is below the closest wall
+    }
+
+    distX = pPos.x - hPos.x;
+    if(abs(distX) == 1){
+      step.moveDir.x = -1 * distX;
+    }
+
+    distY = pPos.y - hPos.y;
+    if(abs(distY) == 1){
+      step.moveDir.y = -1 * distY;
+    }
+
+    return step;
+  }
+};
 }
 }
 #endif
