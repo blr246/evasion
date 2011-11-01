@@ -235,7 +235,7 @@ inline bool WallCreationLockedOut(const State& state, int* simTimeUnlocked)
 {
   assert(simTimeUnlocked);
   // See if walls maxed out.
-  if (state.maxWalls <= static_cast<int>(state.walls.size()))
+  if (static_cast<int>(state.walls.size()) == state.maxWalls)
   {
     *simTimeUnlocked = std::numeric_limits<int>::max();
     return true;
