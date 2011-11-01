@@ -88,60 +88,69 @@ TEST(evasion_game, RandomStrategy)
   Process vis;
   InitializeVis(state, &vis);
 
+  enum { MaxIterations = 10000, };
   enum { MoveType_H = 2, };
   int moveType = MoveType_H;
   // We will limit iterations here for demo purposes.
-  while (!PreyCaptured(state) && moveType < 10000)
+  // Do limited number of iterations.
+  while (moveType < MaxIterations)
   {
-    if (0 == (moveType % MoveType_H))
+    int dueTime;
+    const bool makeWallLocked = (WallCreationLockedOut(state, &dueTime));
+    const bool noWalls = state.walls.empty();
+    enum { NWallMkProb = 50, };
+    enum { NWallRmProb = 200, };
+    // Make walls exclusively from removing them in this test.
+    const bool makeWall = !makeWallLocked && (0 == RandBound(NWallMkProb));
+    const bool rmWall = !noWalls && !makeWall && (0 == RandBound(NWallRmProb));
+    // First setup the move.
+    StepH stepH;
+    if (rmWall)
     {
-      StepH stepH;
-      int dueTime;
-      if (WallCreationLockedOut(state, &dueTime))
-      {
-        // 1 in N shot of removing a wall.
-        enum { NWallRmProb = 200, };
-        const int rmWalls = RandBound(NWallRmProb);
-        if (0 == rmWalls)
-        {
-          State::WallList walls = state.walls;
-          const int rmCount = RandBound(walls.size()) + 1;
-          std::random_shuffle(walls.begin(), walls.end());
-          // Remove random wall(s).
-          stepH.removeWalls.resize(rmCount);
-          std::copy(walls.begin(), walls.begin() + rmCount,
-                    stepH.removeWalls.begin());
-        }
-      }
-      else
-      {
-        // 1 in N shot of making a wall.
-        enum { NWallMkProb = 50, };
-        const int makeWall = RandBound(NWallMkProb);
-        if (0 == makeWall)
-        {
-          const int wallType = RandBound(2);
-          if (0 == wallType)
-          {
-            stepH.wallCreateFlag = StepH::WallCreate_Horizontal;
-          }
-          else
-          {
-            stepH.wallCreateFlag = StepH::WallCreate_Vertical;
-          }
-        }
-      }
-      if (PlyError::Success != DoPly(stepH, &state))
-      {
-        continue;
-      }
+      assert(!makeWall);
+      // Copy walls and random shuffle.
+      State::WallList walls = state.walls;
+      std::random_shuffle(walls.begin(), walls.end());
+      // Remove random wall(s).
+      const int rmCount = RandBound(walls.size()) + 1;
+      stepH.removeWalls.resize(rmCount);
+      std::copy(walls.begin(), walls.begin() + rmCount,
+                stepH.removeWalls.begin());
     }
     else
     {
-      StepH stepH;
+      // Either make a wall or do nothing.
+      assert((makeWall && !rmWall) || (!makeWall && !rmWall));
+      if (makeWall)
+      {
+        const int wallType = RandBound(2);
+        if (0 == wallType)
+        {
+          stepH.wallCreateFlag = StepH::WallCreate_Horizontal;
+        }
+        else
+        {
+          stepH.wallCreateFlag = StepH::WallCreate_Vertical;
+        }
+      }
+    }
+    PlyError err;
+    // Alternate between {H} and {H, P} moves.
+    if (0 == (moveType % MoveType_H))
+    {
+      err = DoPly(stepH, &state);
+    }
+    else
+    {
       StepP stepP;
       stepP.moveDir = State::Direction(RandBound(3) - 1, RandBound(3) - 1);
-      DoPly(stepH, stepP, &state);
+      err = DoPly(stepH, stepP, &state);
+    }
+    // Do-over on case when the move does not succeed. This happens rarely when
+    // H is trapped in a minutely confined space.
+    if (PlyError::Success != err)
+    {
+      continue;
     }
     UpdateVis(state, &vis);
     ++moveType;
