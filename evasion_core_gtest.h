@@ -1,6 +1,7 @@
 #ifndef _HPS_EVASION_EVASION_CORE_GTEST_H_
 #define _HPS_EVASION_EVASION_CORE_GTEST_H_
 #include "evasion_core.h"
+#include "wall_clip_util.h"
 #include "gtest/gtest.h"
 #include <sstream>
 
@@ -303,69 +304,100 @@ TEST(evasion_core, PlyH)
   }
 }
 
+template <int WallDirection>
+struct CreateFlagForWallType;
+template <>
+struct CreateFlagForWallType<State::Wall::Type_Horizontal>
+{ enum { val = StepH::WallCreate_Horizontal, }; };
+template <>
+struct CreateFlagForWallType<State::Wall::Type_Vertical>
+{ enum { val = StepH::WallCreate_Vertical, }; };
+
+template <int WallDirection>
+void TestWallCreateSingleDirection()
+{
+  typedef evasion::detail::WallClipHelper<WallDirection> CoordHelper;
+  enum { MaxWalls = 10, };
+  enum { MinCreatePeriod = 0, };
+  enum { MaxCreatePeriod = 10, };
+  const int numWalls = 1 + RandBound(MaxWalls);
+  const int createPeriod = MinCreatePeriod + RandBound(MaxCreatePeriod - MinCreatePeriod + 1);
+  State state;
+  Initialize(numWalls, createPeriod, &state);
+  enum { MoveType_H = 2, };
+  int moveType = 0;
+  StepH wallCreate;
+  wallCreate.wallCreateFlag =
+    static_cast<StepH::WallCreateFlag>(CreateFlagForWallType<WallDirection>::val);
+  StepH emptyH;
+  StepP emptyP;
+  // Force P to be in an impossible location to prevent wall interference.
+  state.posStackP.push_back(State::Position(BoardSizeX + HCatchesPDist,
+                                            BoardSizeY + HCatchesPDist));
+  for (int wallIdx = 0; wallIdx < state.maxWalls; ++wallIdx)
+  {
+    // Create wall. Ignore case where P is in the way (we'll try not to let
+    // that happen for this test).
+    const int wallFixedCoord = CoordHelper::GetFixed(state.motionH.pos);
+    if (0 == (moveType % MoveType_H))
+    {
+      EXPECT_EQ(PlyError::Success, DoPly(wallCreate, &state));
+    }
+    else
+    {
+      EXPECT_EQ(PlyError::Success, DoPly(wallCreate, emptyP, &state));
+    }
+    EXPECT_EQ(state.simTime - 1, state.walls.front().simTimeCreate);
+    EXPECT_EQ(0, CoordHelper::GetClip(state.walls.front().coords.p0));
+    EXPECT_EQ(BoardSizeX, CoordHelper::GetClip(state.walls.front().coords.p1));
+    EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p0), wallFixedCoord);
+    EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p1), wallFixedCoord);
+    ++moveType;
+    // Get due time for walls.
+    int wallDueTime;
+    if (state.wallCreatePeriod > 1)
+    {
+      EXPECT_TRUE(WallCreationLockedOut(state, &wallDueTime));
+    }
+    else
+    {
+      EXPECT_FALSE(WallCreationLockedOut(state, &wallDueTime));
+    }
+    if (wallIdx < (numWalls - 1))
+    {
+      EXPECT_EQ(state.wallCreatePeriod - 2, wallDueTime);
+    }
+    else
+    {
+      EXPECT_EQ(std::numeric_limits<int>::max(), wallDueTime);
+      break;
+    }
+    // Now wait the required time.
+    for (int waitIdx = 0; waitIdx < wallDueTime; ++waitIdx)
+    {
+      if (0 == (moveType % MoveType_H))
+      {
+        EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, &state));
+        EXPECT_EQ(PlyError::Success, DoPly(emptyH, &state));
+      }
+      else
+      {
+        EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, emptyP, &state));
+        EXPECT_EQ(PlyError::Success, DoPly(emptyH, emptyP, &state));
+      }
+      ++moveType;
+    }
+  }
+}
 TEST(evasion_core, CreateWall)
 {
   // Create horizontal walls only. All should be max coord.
   {
-    enum { MaxWalls = 10, };
-    enum { MinCreatePeriod = 0, };
-    enum { MaxCreatePeriod = 10, };
-    const int numWalls = 1 + RandBound(MaxWalls);
-    const int createPeriod = MinCreatePeriod + RandBound(MaxCreatePeriod - MinCreatePeriod + 1);
-    State state;
-    Initialize(numWalls, createPeriod, &state);
-    enum { MoveType_H = 2, };
-    int moveType = 0;
-    StepH wallCreate;
-    wallCreate.wallCreateFlag = StepH::WallCreate_Horizontal;
-    StepH emptyH;
-    StepP emptyP;
-    for (int wallIdx = 0; wallIdx < state.maxWalls; ++wallIdx)
-    {
-      // Create wall. Ignore case where P is in the way (we'll try not to let
-      // that happen for this test).
-      const int wallFixedCoord = state.motionH.pos.y;
-      if (0 == (moveType % MoveType_H))
-      {
-        EXPECT_EQ(PlyError::Success, DoPly(wallCreate, &state));
-      }
-      else
-      {
-        EXPECT_EQ(PlyError::Success, DoPly(wallCreate, emptyP, &state));
-      }
-      EXPECT_EQ(state.simTime, state.walls.front().simTimeCreate);
-      EXPECT_EQ(0, state.walls.front().coords.p0.x);
-      EXPECT_EQ(BoardSizeX, state.walls.front().coords.p1.x);
-      EXPECT_EQ(state.walls.front().coords.p0.y, wallFixedCoord);
-      EXPECT_EQ(state.walls.front().coords.p1.y, wallFixedCoord);
-      ++moveType;
-      // Get due time for walls.
-      int wallDueTime;
-      EXPECT_TRUE(WallCreationLockedOut(state, &wallDueTime));
-      if (wallIdx < (numWalls - 1))
-      {
-        EXPECT_EQ(state.wallCreatePeriod - 1, wallDueTime);
-      }
-      else
-      {
-        EXPECT_EQ(std::numeric_limits<int>::max(), wallDueTime);
-      }
-      // Now wait the required time.
-      for (int waitIdx = 0; waitIdx < state.wallCreatePeriod - 1; ++waitIdx)
-      {
-        if (0 == (moveType % MoveType_H))
-        {
-          EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, &state));
-          EXPECT_EQ(PlyError::Success, DoPly(emptyH, &state));
-        }
-        else
-        {
-          EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, emptyP, &state));
-          EXPECT_EQ(PlyError::Success, DoPly(emptyH, emptyP, &state));
-        }
-        ++moveType;
-      }
-    }
+    TestWallCreateSingleDirection<State::Wall::Type_Horizontal>();
+  }
+  // Create vertical walls only. All should be max coord.
+  {
+    TestWallCreateSingleDirection<State::Wall::Type_Vertical>();
   }
 }
 

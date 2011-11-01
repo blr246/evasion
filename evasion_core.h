@@ -222,8 +222,8 @@ inline bool PreyCaptured(const State& state)
 ///   <para> For instance, suppose that wall creation is locked out with the
 ///     current sim time at 54. Suppose that the wall creation period is 10
 ///     time steps and that the last wall was created at sim time 50. Then
-///     this function returns true and indicates that it is 6 time steps until
-///     wall creation is allowed again since 50 + 10 = 60 and 60 - 54 - 6.
+///     this function returns true and indicates that it is 5 time steps until
+///     wall creation is allowed again since 50 + 10 - 1 = 59 and 59 - 54 - 5.
 ///   </para>
 ///   <para> If wall creation is locked out by limit of the max number of walls
 ///     then the time steps until it is unlocked will be infinite. If wall
@@ -242,7 +242,7 @@ inline bool WallCreationLockedOut(const State& state, int* simTimeUnlocked)
   }
   else
   {
-    const int simTimeDue = state.simTimeLastWall + state.wallCreatePeriod;
+    const int simTimeDue = state.simTimeLastWall + state.wallCreatePeriod - 1;
     *simTimeUnlocked = simTimeDue - state.simTime;
     return (*simTimeUnlocked > 0);
   }
