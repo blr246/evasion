@@ -181,6 +181,22 @@ inline bool operator!=(const Segment2<NumericType>& lhs, const Segment2<NumericT
   return !(lhs == rhs);
 }
 
+template <typename NumericType>
+Vector2<NumericType> ClosestPointInSegment(const Segment2<NumericType>& seg, const Vector2<NumericType> p)
+{
+  Vector2<NumericType> result;
+  NumericType dp;
+  NumericType xDiff = seg.p0.x - seg.p1.x;
+  NumericType yDiff = seg.p0.y - seg.p1.y;
+  dp = (xDiff*(p.x - seg.p1.x) + yDiff*(p.y - seg.p1.y));
+  dp = dp / ((xDiff * xDiff) + (yDiff * yDiff));
+
+  result.x = xDiff*dp + seg.p1.x;
+  result.y = yDiff*dp + seg.p1.y;
+
+  return result;
+}
+
 /// <summary> A segment defined by two points with direction. </summary>
 template <typename NumericType_>
 struct DirectedSegment
