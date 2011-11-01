@@ -46,7 +46,11 @@ if(HPS_GTEST_ENABLED)
                           COMPILE_FLAGS ${OpenMP_CXX_FLAGS})
   endif(WIN32)
   add_test(evasion_gtest evasion_gtest)
-  set(COPY_FILES "evasion_vis.py")
+  set(COPY_FILES
+	  "evasion_game_server.py"
+	  "evasion_game_client.py"
+	  "myplot2.py"
+	  "evasion_vis.py")
   file(COPY ${COPY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif(HPS_GTEST_ENABLED)
 

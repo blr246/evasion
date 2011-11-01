@@ -5,6 +5,7 @@
 #include <utility>
 #include <limits>
 #include <assert.h>
+#include <map>
 
 namespace hps
 {
@@ -117,6 +118,8 @@ struct State
   PreyState preyState;
   /// <summary> Temporary memory for walls manipulation. </summary>
   WallList wallsTemp;
+  /// <summary> Sim time to wall idx in evasion_game_server.py </summary>
+  std::map<int, int> mapSimTimeToIdx;
 };
 
 /// <summary> Data used for H to move one step. </summary>
@@ -266,6 +269,12 @@ inline void Initialize(const int maxWalls, const int wallCreatePeriod,
   state->wallCreatePeriod = wallCreatePeriod;
   state->simTimeLastWall = -wallCreatePeriod;
 }
+
+/// <summary> Parse a string in the format given by
+///   evasion_game_server.py.
+/// </summary>
+bool ParseStateString(const std::string& stateStr, const int m, const int n,
+                      State* state);
 
 }
 using namespace evasion;

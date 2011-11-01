@@ -59,6 +59,42 @@ TEST(evasion_core, CoreObject)
   }
 }
 
+TEST(evasion_core, ReadState)
+{
+  // The following were recovered from the console.
+  // ***
+  // You are Hunter
+  // Hunter:0 0 1 1
+  // Prey:  330 200
+  // Walls: []
+  // 
+  // ***
+  // You are Prey
+  // Hunter:0 0 1 1
+  // Prey:  330 200
+  // Walls: []
+  // 
+  // ***
+  {
+    const char stateStr[] = "You are Hunter\n"
+                            "Hunter:0 0 1 1\n"
+                            "Prey:  330 200\n"
+                            "Walls: []\n"
+                            "\n";
+    State state;
+    EXPECT_TRUE(ParseStateString(std::string(stateStr), 3, 4, &state));
+  }
+  {
+    const char stateStr[] = "You are Prey\n"
+                            "Hunter:0 0 1 1\n"
+                            "Prey:  330 200\n"
+                            "Walls: []\n"
+                            "\n";
+    State state;
+    EXPECT_TRUE(ParseStateString(std::string(stateStr), 3, 4, &state));
+  }
+}
+
 /// <summary> Test motion interaction with a single wall. </summary>
 void PlyHSingleWallTestAllDir(const State::Wall& hit, const bool isBorder)
 {

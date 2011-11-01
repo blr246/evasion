@@ -482,5 +482,266 @@ void UndoPly(const StepH& stepH, const StepP& /*stepP*/, State* state)
   assert(state->simTime >= 0);
 }
 
+bool ReadToken(const int idx, std::istream* stream, std::string* token)
+{
+  assert(stream && token);
+  for (int tokenIdx = 0; tokenIdx < idx; ++tokenIdx)
+  {
+    if (stream->good())
+    {
+      std::string burn;
+      *stream >> burn;
+    }
+    else
+    {
+      return false;
+    }
+  }
+  if (stream->good())
+  {
+    token->clear();
+    *stream >> *token;
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
+struct TokenIterator
+{
+  TokenIterator(std::istream* stream_) : stream(stream_), idx(0) {}
+  TokenIterator(std::istream* stream_, int idx_) : stream(stream_), idx(idx_) {}
+  bool Next(const int tokenIdx, std::string* token)
+  {
+    const int offset = tokenIdx - idx;
+    assert(offset >= 0);
+    idx = tokenIdx + 1;
+    return ReadToken(offset, stream, token);
+  }
+  std::istream* stream;
+  int idx;
+};
+
+// Walls: [wall_index (x0, y0, x1, y1), wall_index (x0, y0, x1, y1), ...]
+struct PyArrPunctuationToChar
+{
+  PyArrPunctuationToChar(char c_) : c(c_) {}
+  inline char operator()(const char in) const
+  {
+    if ((',' == in) || ('(' == in) || (')' == in) || ('[' == in) || (']' == in))
+    {
+      return c;
+    }
+    else
+    {
+      return in;
+    }
+  }
+  char c;
+};
+
+template <typename Type>
+void ExtractToken(const std::string& token, Type* out)
+{
+  assert(out);
+  std::stringstream ssToken(token);
+  ssToken >> *out;
+}
+
+bool ParseStateString(const std::string& stateStr, const int m, const int n,
+                      State* state)
+{
+  assert(state);
+  // Board output is specified in evasion_game_server.py:
+  //   1| conn1.send("You are Hunter\n" + str(board))
+  // -OR-
+  //   1| conn1.send("You are Prey\n" + str(board))
+  //  -WHERE str(hunter) is-
+  //   2| return "Hunter:" + str(self.x) + " " + str(self.y) + " " +
+  //                         str(self.delta_x) + " " + str(self.delta_y) + "\n"
+  //  -WHERE str(prey) is-
+  //   3| return "Prey:  " + str(self.x) + " " + str(self.y) + "\n"
+  //  -WHERE str(board) is-
+  //   4| out += "Walls: ["
+  //      wall_strs = []
+  //      for i, wall in enumerate(self.walls[:-4]):
+  //      if wall:
+  //      if wall[0] == 1:
+  //      wall_strs.append("%d (%d, %d, %d, %d)" % (i, wall[3], wall[1], wall[3], wall[2]))
+  //      else:
+  //      wall_strs.append("%d (%d, %d, %d, %d)" % (i, wall[1], wall[3], wall[2], wall[3]))
+  //      out += ", ".join(wall_strs) + "]\n"
+  //      return out
+  //
+  // The following were recovered from the console.
+  // ***
+  // You are Hunter
+  // Hunter:0 0 1 1
+  // Prey:  330 200
+  // Walls: []
+  // 
+  // ***
+  // You are Prey
+  // Hunter:0 0 1 1
+  // Prey:  330 200
+  // Walls: []
+  // 
+  // ***
+  Initialize(m, n, state);
+  enum { BoardStateLines = 4, };
+  enum { Hunter, Prey };
+  std::stringstream ssLines;
+  ssLines.str(stateStr);
+  int player;
+  // Line 1.
+  {
+    enum { Token_Player = 2, };
+    std::string strLine;
+    std::getline(ssLines, strLine);
+    std::stringstream ssLine(strLine);
+    std::string strPlayer;
+    if (!ReadToken(Token_Player, &ssLine, &strPlayer))
+    {
+      return false;
+    }
+    if ("Hunter" == strPlayer)
+    {
+      player = Hunter;
+    }
+    else
+    {
+      assert("Prey" == strPlayer);
+      player = Prey;
+    }
+  }
+  // Line 2.
+  State::HunterMotionInfo& motionH = state->motionH;
+  {
+    enum { Token_Px = 1, Token_Py, Token_Dx, Token_Dy, };
+    std::string strLine;
+    std::getline(ssLines, strLine);
+    // Replace ':' with ' ' since output has no space delim after colon.
+    const size_t colonPos = strLine.find_first_of(':', 0);
+    if (std::string::npos == colonPos)
+    {
+      return false;
+    }
+    strLine[colonPos] = ' ';
+    std::stringstream ssLine(strLine);
+    TokenIterator tokenIter(&ssLine);
+    // Px
+    {
+      std::string token;
+      if (!tokenIter.Next(Token_Px, &token))
+      {
+        return false;
+      }
+      ExtractToken(token, &motionH.pos.x);
+    }
+    // Py
+    {
+      std::string token;
+      if (!tokenIter.Next(Token_Py, &token))
+      {
+        return false;
+      }
+      std::stringstream ssTok(token);
+      ssTok >> motionH.pos.y;
+    }
+    // Dx
+    {
+      std::string token;
+      if (!tokenIter.Next(Token_Dx, &token))
+      {
+        return false;
+      }
+      std::stringstream ssTok(token);
+      ssTok >> motionH.dir.x;
+    }
+    // Dy
+    {
+      std::string token;
+      if (!tokenIter.Next(Token_Dy, &token))
+      {
+        return false;
+      }
+      std::stringstream ssTok(token);
+      ssTok >> motionH.dir.y;
+    }
+  }
+  // Line 3.
+  State::Position& posP = state->posStackP.front();
+  {
+    enum { Token_Px = 1, Token_Py, };
+    std::string strLine;
+    std::getline(ssLines, strLine);
+    std::stringstream ssLine(strLine);
+    TokenIterator tokenIter(&ssLine);
+    // Px
+    {
+      std::string token;
+      if (!tokenIter.Next(Token_Px, &token))
+      {
+        return false;
+      }
+      std::stringstream ssTok(token);
+      ssTok >> posP.x;
+    }
+    // Py
+    {
+      std::string token;
+      if (!tokenIter.Next(Token_Py, &token))
+      {
+        return false;
+      }
+      std::stringstream ssTok(token);
+      ssTok >> posP.y;
+    }
+  }
+  // Line 4.
+  // Walls: [wall_index (x0, y0, x1, y1), wall_index (x0, y0, x1, y1), ...]
+  {
+    enum { Token_Idx = 0, Token_x0, Token_y0, Token_x1, Token_y1, };
+    std::string strLine;
+    std::getline(ssLines, strLine);
+    std::string strNoPunctuation(strLine);
+    std::transform(strLine.begin(), strLine.end(),
+                   strNoPunctuation.begin(), PyArrPunctuationToChar(' '));
+    std::stringstream ssLine(strLine);
+    // Ignore "Walls:"
+    {
+      std::string burn;
+      if (!ReadToken(0, &ssLine, &burn))
+      {
+        return false;
+      }
+    }
+    TokenIterator tokenIter(&ssLine);
+    // Read walls.
+    int wallCount = 0;
+    while (ssLine.good())
+    {
+      // Read wall_index.
+      int wallIdx;
+      {
+        std::string token;
+        if (!tokenIter.Next(Token_Idx * wallCount, &token))
+        {
+          return false;
+        }
+        std::stringstream ssTok(token);
+        ssTok >> posP.x;
+      }
+      ++wallCount;
+      // Record this wall mapping.
+      const int wallId = -wallCount;
+      state->mapSimTimeToIdx[wallId] = wallIdx;
+    }
+  }
+  return true;
+}
+
 }
 }
