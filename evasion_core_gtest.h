@@ -342,6 +342,7 @@ void TestWallCreate(const bool alternateDir)
   State::Position wallCreatePosLast(-1, -1);
   for (int wallIdx = 0; wallIdx < state.maxWalls; ++wallIdx)
   {
+    EXPECT_EQ(moveType, state.simTime);
     // Create wall. Ignore case where P is in the way (we'll try not to let
     // that happen for this test).
     const int alternateId = alternateDir && (wallIdx % 2);
@@ -352,11 +353,19 @@ void TestWallCreate(const bool alternateDir)
     State::Position wallCreatePosNow = state.motionH.pos;
     if (0 == (moveType % MoveType_H))
     {
+      const State stateBefore = state;
       EXPECT_EQ(PlyError::Success, DoPly(wallCreate, &state));
+      UndoPly(wallCreate, &state);
+      EXPECT_EQ(stateBefore, state);
+      DoPly(wallCreate, &state);
     }
     else
     {
+      const State stateBefore = state;
       EXPECT_EQ(PlyError::Success, DoPly(wallCreate, emptyP, &state));
+      UndoPly(wallCreate, emptyP, &state);
+      EXPECT_EQ(stateBefore, state);
+      DoPly(wallCreate, emptyP, &state);
     }
     EXPECT_EQ(state.simTime - 1, state.walls.front().simTimeCreate);
     // Clip coords when alternating.
@@ -431,12 +440,20 @@ void TestWallCreate(const bool alternateDir)
       if (0 == (moveType % MoveType_H))
       {
         EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, &state));
+        const State stateBefore = state;
         EXPECT_EQ(PlyError::Success, DoPly(emptyH, &state));
+        UndoPly(emptyH, &state);
+        EXPECT_EQ(stateBefore, state);
+        DoPly(emptyH, &state);
       }
       else
       {
         EXPECT_NE(0, PlyError::WallCreationLockedOut & DoPly(wallCreate, emptyP, &state));
+        const State stateBefore = state;
         EXPECT_EQ(PlyError::Success, DoPly(emptyH, emptyP, &state));
+        UndoPly(emptyH, emptyP, &state);
+        EXPECT_EQ(stateBefore, state);
+        DoPly(emptyH, emptyP, &state);
       }
       ++moveType;
     }
@@ -484,6 +501,10 @@ TEST(evasion_core, CreateWall)
       TestWallCreate<State::Wall::Type_Vertical>(true);
     }
   }
+}
+
+TEST(evasion_core, RemoveWalls)
+{
 }
 
 }
