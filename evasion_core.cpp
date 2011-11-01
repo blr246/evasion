@@ -83,52 +83,50 @@ State::State()
 namespace detail
 {
 template <int WallDirection>
-struct WallClipHelper
+struct WallClipHelper;
+
+/// <summary> Coordinate helper for horizontal wall clipping. </summary>
+template <>
+struct WallClipHelper<State::Wall::Type_Horizontal>
 {
-  typedef State::Position Position;
-  typedef State::Wall::Coordinates WallCoordinates;
-  typedef State::Wall Wall;
-  typedef State::WallList WallList;
-
-  template <int Direction>
-  struct CoordHelper;
-
-  /// <summary> Coordinate helper for horizontal wall clipping. </summary>
-  template <>
-  struct CoordHelper<State::Wall::Type_Horizontal>
-  {
     enum { OtherDirection = State::Wall::Type_Vertical, };
-    inline static const int& GetFixed(const Position& pt) { return pt.y; }
-    inline static int& GetFixed(Position& pt) { return pt.y; }
-    inline static const int& GetClip(const Position& pt) { return pt.x; }
-    inline static int& GetClip(Position& pt) { return pt.x; }
-    inline static const WallCoordinates InitWallCoords(const int fixed)
+  inline static const int& GetFixed(const State::Position& pt) { return pt.y; }
+  inline static int& GetFixed(State::Position& pt) { return pt.y; }
+  inline static const int& GetClip(const State::Position& pt) { return pt.x; }
+  inline static int& GetClip(State::Position& pt) { return pt.x; }
+  inline static const State::Wall::Coordinates InitWallCoords(const int fixed)
     {
-      return WallCoordinates(Position(0, fixed), Position(BoardSizeX, fixed));
+    return State::Wall::Coordinates(State::Position(0, fixed),
+                                    State::Position(BoardSizeX, fixed));
     }
-  };
+};
 
-  /// <summary> Coordinate helper for vertical wall clipping. </summary>
-  template <>
-  struct CoordHelper<State::Wall::Type_Vertical>
-  {
+/// <summary> Coordinate helper for vertical wall clipping. </summary>
+template <>
+struct WallClipHelper<State::Wall::Type_Vertical>
+{
     enum { OtherDirection = State::Wall::Type_Horizontal, };
-    inline static const int& GetFixed(const Position& pt) { return pt.x; }
-    inline static int& GetFixed(Position& pt) { return pt.x; }
-    inline static const int& GetClip(const Position& pt) { return pt.y; }
-    inline static int& GetClip(Position& pt) { return pt.y; }
-    inline static const WallCoordinates InitWallCoords(const int fixed)
+  inline static const int& GetFixed(const State::Position& pt) { return pt.x; }
+  inline static int& GetFixed(State::Position& pt) { return pt.x; }
+  inline static const int& GetClip(const State::Position& pt) { return pt.y; }
+  inline static int& GetClip(State::Position& pt) { return pt.y; }
+  inline static const State::Wall::Coordinates InitWallCoords(const int fixed)
     {
-      return WallCoordinates(Position(fixed, 0), Position(fixed, BoardSizeY));
+    return State::Wall::Coordinates(State::Position(fixed, 0),
+                                    State::Position(fixed, BoardSizeY));
     }
-  };
+};
 
-  /// <summary> Create a wall clipped by a list of existing walls. </summary>
-  static Wall CreateClipped(const Position& pt,
-                            const WallList::const_iterator& first,
-                            const WallList::const_iterator& last)
-  {
-    typedef CoordHelper<WallDirection> CoordHelp;
+/// <summary> Create a wall clipped by a list of existing walls. </summary>
+template <int WallDirection>
+State::Wall CreateClipped(const State::Position& pt,
+                          const State::WallList::const_iterator& first,
+                          const State::WallList::const_iterator& last)
+{
+  typedef State::WallList WallList;
+  typedef State::Wall Wall;
+  typedef State::Wall::Coordinates WallCoordinates;
+  typedef WallClipHelper<WallDirection> CoordHelp;
     const int fixed = CoordHelp::GetFixed(pt);
     Wall wall;
     {
@@ -140,7 +138,7 @@ struct WallClipHelper
     for (WallList::const_iterator clipW = first; clipW != last; ++clipW)
     {
       const WallCoordinates& clipCoords = clipW->coords;
-      if ((CoordHelp::OtherDirection == clipW->type) &&
+    if ((static_cast<int>(CoordHelp::OtherDirection) == clipW->type) &&
           ((CoordHelp::GetFixed(clipCoords.p0) <= fixed) &&
            (CoordHelp::GetFixed(clipCoords.p1) >= fixed)))
       {
@@ -160,19 +158,20 @@ struct WallClipHelper
       }
     }
     return wall;
-  }
+}
 
-  /// <summary> See if the point collides with the wall. </sumamry>
-  inline static bool CheckCollision(const WallCoordinates& wc,
-                                    const Position& pt)
-  {
-    typedef CoordHelper<WallDirection> CoordHelp;
+/// <summary> See if the point collides with the wall. </sumamry>
+template <int WallDirection>
+inline static bool CheckCollision(const State::Wall::Coordinates& wc,
+                                  const State::Position& pt)
+{
+  typedef WallClipHelper<WallDirection> CoordHelp;
     assert(CoordHelp::GetFixed(wc.p0) == CoordHelp::GetFixed(wc.p1));
     return (CoordHelp::GetFixed(pt) == CoordHelp::GetFixed(wc.p0)) &&
            (CoordHelp::GetClip(wc.p0) <= CoordHelp::GetClip(pt)) &&
            (CoordHelp::GetClip(wc.p1) >= CoordHelp::GetClip(pt));
-  }
-};
+}
+
 /// <summary> Advance the player's motion. </summary>
 /// <remarks>
 ///   <para> Apply the motion info direction to the position. In the case of a
@@ -214,22 +213,21 @@ bool MovePlayer(const State::Board& board,
   bool moveInvalid = false;
   for (State::WallList::const_iterator wall = wallFirst; wall != wallLast; ++wall)
   {
+    const State::Wall::Coordinates coords = wall->coords;
     if (State::Wall::Type_Horizontal == wall->type)
     {
-      typedef WallClipHelper<State::Wall::Type_Horizontal> CollisionHelper;
-      const State::Wall::Coordinates coords = wall->coords;
-      hitWallH |= CollisionHelper::CheckCollision(coords, posNewV);
+      hitWallH |= CheckCollision<State::Wall::Type_Horizontal>(coords, posNewV);
       hitWallH |= (coords.p0 == posNewV) || (coords.p1 == posNewV);
-      moveInvalid |= !hitWallH && CollisionHelper::CheckCollision(wall->coords, posNew);
+      moveInvalid |= !hitWallH &&
+                     CheckCollision<State::Wall::Type_Horizontal>(wall->coords, posNew);
     }
     else
     {
       assert(State::Wall::Type_Vertical == wall->type);
-      typedef WallClipHelper<State::Wall::Type_Vertical> CollisionHelper;
-      const State::Wall::Coordinates coords = wall->coords;
-      hitWallV |= CollisionHelper::CheckCollision(coords, posNewH);
+      hitWallV |= CheckCollision<State::Wall::Type_Vertical>(coords, posNewH);
       hitWallV |= (coords.p0 == posNewH) || (coords.p1 == posNewH);
-      moveInvalid |= !hitWallV && CollisionHelper::CheckCollision(wall->coords, posNew);
+      moveInvalid |= !hitWallV &&
+                     CheckCollision<State::Wall::Type_Vertical>(wall->coords, posNew);
     }
   }
   if (!moveInvalid)
@@ -288,14 +286,12 @@ PlyError DoStepH(const StepH& step, State* state)
       {
         if (State::Wall::Type_Horizontal == rmWall->type)
         {
-          typedef WallClipHelper<State::Wall::Type_Horizontal> WallClipepr;
-          unstuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+          unstuck = CheckCollision<State::Wall::Type_Horizontal>(rmWall->coords, posH);
         }
         else
         {
           assert(State::Wall::Type_Vertical == rmWall->type);
-          typedef WallClipHelper<State::Wall::Type_Vertical> WallClipepr;
-          unstuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+          unstuck = CheckCollision<State::Wall::Type_Vertical>(rmWall->coords, posH);
         }
       }
       // Remove wall is valid?
@@ -347,21 +343,20 @@ PlyError DoStepH(const StepH& step, State* state)
       // See if wall will intersect P by first creating the wall.
       const State::Position& posH = state->motionH.pos;
       const State::Position& posP = state->posStackP.back();
+      const State::WallList::const_iterator firstWall = walls.begin() + numWalls;
       if (StepH::WallCreate_Horizontal == step.wallCreateFlag)
       {
-        typedef WallClipHelper<State::Wall::Type_Horizontal> WallClipCreator;
         assert(StepH::WallCreate_Horizontal == step.wallCreateFlag);
-        wall = WallClipCreator::CreateClipped(posH, walls.begin() + numWalls,
-                                              walls.end());
+        wall = CreateClipped<State::Wall::Type_Horizontal>(posH, firstWall, walls.end());
         assert(State::Wall::Type_Horizontal == wall.type);
         // Check interference.
-        if (WallClipCreator::CheckCollision(wall.coords, posP))
+        if (CheckCollision<State::Wall::Type_Horizontal>(wall.coords, posP))
         {
           std::cerr << "DoStepH() : Creation of horizontal wall cannot proceed "
                     << "since P is in the way." << std::endl;
           err |= PlyError::WallCreateInterference;
         }
-        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.pos))
+        if (CheckCollision<State::Wall::Type_Horizontal>(wall.coords, motionHNew.pos))
         {
           std::cerr << "DoStepH() : Creation of horizontal wall cannot proceed "
                     << "since H moves in the way." << std::endl;
@@ -370,19 +365,17 @@ PlyError DoStepH(const StepH& step, State* state)
       }
       else
       {
-        typedef WallClipHelper<State::Wall::Type_Vertical> WallClipCreator;
         assert(StepH::WallCreate_Vertical == step.wallCreateFlag);
-        wall = WallClipCreator::CreateClipped(posH, walls.begin() + numWalls,
-                                              walls.end());
+        wall = CreateClipped<State::Wall::Type_Vertical>(posH, firstWall, walls.end());
         assert(State::Wall::Type_Vertical == wall.type);
         // Check interference.
-        if (WallClipCreator::CheckCollision(wall.coords, posP))
+        if (CheckCollision<State::Wall::Type_Vertical>(wall.coords, posP))
         {
           std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
                     << "since P is in the way." << std::endl;
           err |= PlyError::WallCreateInterference;
         }
-        if (WallClipCreator::CheckCollision(wall.coords, motionHNew.pos))
+        if (CheckCollision<State::Wall::Type_Vertical>(wall.coords, motionHNew.pos))
         {
           std::cerr << "DoStepH() : Creation of vertical wall cannot proceed "
                     << "since H moves in the way." << std::endl;
@@ -453,14 +446,12 @@ inline void UndoStepH(const StepH& step, State* state)
     {
       if (State::Wall::Type_Horizontal == rmWall->type)
       {
-        typedef WallClipHelper<State::Wall::Type_Horizontal> WallClipepr;
-        stuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+        stuck = CheckCollision<State::Wall::Type_Horizontal>(rmWall->coords, posH);
       }
       else
       {
         assert(State::Wall::Type_Vertical == rmWall->type);
-        typedef WallClipHelper<State::Wall::Type_Vertical> WallClipepr;
-        stuck = WallClipepr::CheckCollision(rmWall->coords, posH);
+        stuck = CheckCollision<State::Wall::Type_Vertical>(rmWall->coords, posH);
       }
     }
     walls.push_back(*rmWall);
