@@ -93,6 +93,16 @@ TEST(evasion_core, ReadState)
     State state;
     EXPECT_TRUE(ParseStateString(std::string(stateStr), 3, 4, &state));
   }
+  // Walls: [wall_index (x0, y0, x1, y1), wall_index (x0, y0, x1, y1), ...]
+  {
+    const char stateStr[] = "You are Prey\n"
+                            "Hunter:0 0 1 1\n"
+                            "Prey:  330 200\n"
+                            "Walls: [0 (0, 0, 0, 499), 1 (1, 4, 499, 4)]\n"
+                            "\n";
+    State state;
+    EXPECT_TRUE(ParseStateString(std::string(stateStr), 3, 4, &state));
+  }
 }
 
 /// <summary> Test motion interaction with a single wall. </summary>

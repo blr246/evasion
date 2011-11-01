@@ -698,13 +698,15 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
   // Line 4.
   // Walls: [wall_index (x0, y0, x1, y1), wall_index (x0, y0, x1, y1), ...]
   {
-    enum { Token_Idx = 0, Token_x0, Token_y0, Token_x1, Token_y1, };
+    enum { Token_Idx = 0, Token_x0, Token_y0, Token_x1, Token_y1, Token_Count, };
     std::string strLine;
     std::getline(ssLines, strLine);
     std::string strNoPunctuation(strLine);
     std::transform(strLine.begin(), strLine.end(),
                    strNoPunctuation.begin(), PyArrPunctuationToChar(' '));
-    std::stringstream ssLine(strLine);
+    strNoPunctuation = strNoPunctuation.substr(0, strNoPunctuation.find_last_not_of(' ') + 1);
+    strNoPunctuation = strNoPunctuation.substr(strNoPunctuation.find_first_not_of(' '));
+    std::stringstream ssLine(strNoPunctuation);
     // Ignore "Walls:"
     {
       std::string burn;
@@ -722,7 +724,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
       int wallIdx;
       {
         std::string token;
-        if (!tokenIter.Next(Token_Idx * wallCount, &token))
+        if (!tokenIter.Next(Token_Idx + (Token_Count * wallCount), &token))
         {
           return false;
         }
@@ -734,7 +736,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
         // p0.x
         {
           std::string token;
-          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          if (!tokenIter.Next(Token_x0 + (Token_Count * wallCount), &token))
           {
             return false;
           }
@@ -743,7 +745,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
         // p0.y
         {
           std::string token;
-          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          if (!tokenIter.Next(Token_y0 + (Token_Count * wallCount), &token))
           {
             return false;
           }
@@ -752,7 +754,7 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
         // p1.x
         {
           std::string token;
-          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          if (!tokenIter.Next(Token_x1 + (Token_Count * wallCount), &token))
           {
             return false;
           }
@@ -761,19 +763,28 @@ bool ParseStateString(const std::string& stateStr, const int m, const int n,
         // p1.y
         {
           std::string token;
-          if (!tokenIter.Next(Token_x0 * wallCount, &token))
+          if (!tokenIter.Next(Token_y1 + (Token_Count * wallCount), &token))
           {
             return false;
           }
           ExtractToken(token, &wall.coords.p1.y);
         }
       }
-      // Add the wall.
       ++wallCount;
-      state->walls.push_back(wall);
       // Record this wall mapping.
-      const int wallId = -wallCount;
-      state->mapSimTimeToIdx[wallId] = wallIdx;
+      wall.simTimeCreate = -wallCount;
+      state->mapSimTimeToIdx[wall.simTimeCreate] = wallIdx;
+      if (wall.coords.p0.x == wall.coords.p1.x)
+      {
+        wall.type = State::Wall::Type_Vertical;
+      }
+      else
+      {
+        assert(wall.coords.p0.y == wall.coords.p1.y);
+        wall.type = State::Wall::Type_Horizontal;
+      }
+      // Add the wall.
+      state->walls.push_back(wall);
     }
   }
   return true;
