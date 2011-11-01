@@ -13,7 +13,7 @@ struct Prey{
   virtual StepP NextStep(State& game) = 0;
 };
 
-struct RandomPrey{
+struct RandomPrey : public Prey{
   RandomPrey(){};
 
   StepP NextStep(State& state)
@@ -132,7 +132,6 @@ struct ExtremePrey : public Prey{ //ExtremePrey likes danger.
 
     Vector2<float> point = ClosestPointInLine(HunterWall, FpPos);
     int wallDist = Vector2LengthSq(point - FpPos);
-    std::cout << wallDist << std::endl;
 
     int distX = FpPos.x - point.x;
     int distY = FpPos.y - point.y;
