@@ -653,6 +653,23 @@ TEST(evasion_core, RemoveWalls)
   }
 }
 
+TEST(SerializeStep, StepH)
+{
+  StepH step;
+  std::string s = step.Serialize();
+  EXPECT_EQ("Remove:[] Build:", s);
+}
+
+TEST(SerializeStep, StepP)
+{
+  StepP step;
+  std::string s = step.Serialize();
+  EXPECT_EQ(s, "0 0");
+
+  step.moveDir.x = 1;
+  step.moveDir.y = -1;
+  EXPECT_EQ(s, "1 -1");
+}
 }
 
 #endif //_HPS_EVASION_EVASION_CORE_GTEST_H_

@@ -6,6 +6,7 @@
 #include <limits>
 #include <assert.h>
 #include <map>
+#include <sstream>
 
 namespace hps
 {
@@ -137,6 +138,11 @@ struct StepH
   WallCreateFlag wallCreateFlag;
   /// <summary> Walls to remove. </summary>
   State::WallList removeWalls;
+
+  std::string Serialize(){
+    std::stringstream ss;
+    return ss.str();
+  }
 };
 
 /// <summary> Data used for P to move one step. </summary>
@@ -145,6 +151,13 @@ struct StepP
   StepP() : moveDir(0, 0) {}
   /// <summary> Direction that P will move. </summary>
   State::Direction moveDir;
+  
+  std::string Serialize()
+  {
+    std::stringstream ss;
+    ss << moveDir.x << " " << moveDir.y;
+    return ss.str();
+  }
 };
 
 /// <summary> Bitwise or'd collection of error flags on DoPly(). </summary>
