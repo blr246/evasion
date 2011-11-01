@@ -664,10 +664,13 @@ TEST(SerializeStep, StepP)
 {
   StepP step;
   std::string s = step.Serialize();
+  step.moveDir.x = 0;
+  step.moveDir.y = 0;
   EXPECT_EQ(s, "0 0");
 
   step.moveDir.x = 1;
   step.moveDir.y = -1;
+  s = step.Serialize();
   EXPECT_EQ(s, "1 -1");
 }
 }
