@@ -88,10 +88,9 @@ TEST(evasion_game, RandomStrategy)
   Process vis;
   InitializeVis(state, &vis);
 
-  // Send vis a new state. This is where you play the game.
   enum { MoveType_H = 2, };
   int moveType = MoveType_H;
-  // The Hunter cannot win. We will limit iterations here for demo purposes.
+  // We will limit iterations here for demo purposes.
   while (!PreyCaptured(state) && moveType < 10000)
   {
     if (0 == (moveType % MoveType_H))
@@ -152,7 +151,14 @@ TEST(evasion_game, RandomStrategy)
   vis.WriteStdin(std::string("\r\n"));
   vis.Join();
 
-  std::cout << "Prey captured at time " << state.simTime << "." << std::endl;
+  if (PreyCaptured(state))
+  {
+    std::cout << "Prey captured at time " << state.simTime << "." << std::endl;
+  }
+  else
+  {
+    std::cout << "Timed out at time " << state.simTime << "." << std::endl;
+  }
 }
 
 }
