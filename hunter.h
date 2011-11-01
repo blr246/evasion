@@ -30,6 +30,9 @@ struct BasicHunter : public Hunter{
     //slope would be: numerator/denominator = (y2-y1)/(x2-x1)
     
     
+    int wallCreationAllowedIn = -1;
+    bool wallCreationForbidden = WallCreationLockedOut(game, &wallCreationAllowedIn);
+
     Directions dirP = GetPreyDirection(numerator,denominator);
     if(h.dir.x == 1 && h.dir.y == 1)
     {
