@@ -320,7 +320,7 @@ void TestWallCreate(const bool alternateDir)
   enum { Dir1 = CoordHelper0::OtherDirection, };
   typedef evasion::detail::WallClipHelper<Dir1> CoordHelper1;
   enum { MaxWalls = 10, };
-  enum { MinCreatePeriod = 0, };
+  enum { MinCreatePeriod = 1, };
   enum { MaxCreatePeriod = 10, };
   const int numWalls = 1 + RandBound(MaxWalls);
   const int createPeriod = MinCreatePeriod + RandBound(MaxCreatePeriod - MinCreatePeriod + 1);
@@ -339,7 +339,7 @@ void TestWallCreate(const bool alternateDir)
   // Force P to be in an impossible location to prevent wall interference.
   state.posStackP.push_back(State::Position(BoardSizeX + HCatchesPDist,
                                             BoardSizeY + HCatchesPDist));
-  State::Position wallCreatePos;
+  State::Position wallCreatePosLast(-1, -1);
   for (int wallIdx = 0; wallIdx < state.maxWalls; ++wallIdx)
   {
     // Create wall. Ignore case where P is in the way (we'll try not to let
@@ -349,7 +349,7 @@ void TestWallCreate(const bool alternateDir)
     const int wallFixedCoord = (alternateId) ?
                                CoordHelper1::GetFixed(state.motionH.pos) :
                                CoordHelper0::GetFixed(state.motionH.pos);
-    wallCreatePos = state.motionH.pos;
+    State::Position wallCreatePosNow = state.motionH.pos;
     if (0 == (moveType % MoveType_H))
     {
       EXPECT_EQ(PlyError::Success, DoPly(wallCreate, &state));
@@ -362,27 +362,38 @@ void TestWallCreate(const bool alternateDir)
     // Clip coords when alternating.
     if (alternateDir)
     {
+      // Fixed coordinate is from H position at wall creation time.
+      // Clip coordinat is the previous wall plus one. The previous wall was
+      // created at the last created time.
       if (alternateId)
       {
         typedef CoordHelper1 CoordHelper;
         assert(&wallCreate == &wallCreate1);
-        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePos),
+        // Fixed.
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
                   CoordHelper::GetFixed(state.walls.front().coords.p0));
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
+                  CoordHelper::GetFixed(state.walls.front().coords.p1));
+        // Clip.
+        EXPECT_EQ(CoordHelper::GetClip(wallCreatePosLast) + 1,
+                  CoordHelper::GetClip(state.walls.front().coords.p0));
         EXPECT_EQ(CoordHelper::GetClip(state.board.maxs),
                   CoordHelper::GetClip(state.walls.front().coords.p1));
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p0), wallFixedCoord);
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p1), wallFixedCoord);
       }
       else
       {
         assert(&wallCreate == &wallCreate0);
         typedef CoordHelper0 CoordHelper;
-        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePos),
+        // Fixed.
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
+                  CoordHelper::GetFixed(state.walls.front().coords.p0));
+        EXPECT_EQ(CoordHelper::GetFixed(wallCreatePosNow),
+                  CoordHelper::GetFixed(state.walls.front().coords.p1));
+        // Clip.
+        EXPECT_EQ(CoordHelper::GetClip(wallCreatePosLast) + 1,
                   CoordHelper::GetClip(state.walls.front().coords.p0));
         EXPECT_EQ(CoordHelper::GetClip(state.board.maxs),
                   CoordHelper::GetClip(state.walls.front().coords.p1));
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p0), wallFixedCoord);
-        EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p1), wallFixedCoord);
       }
     }
     else
@@ -395,6 +406,7 @@ void TestWallCreate(const bool alternateDir)
       EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p0), wallFixedCoord);
       EXPECT_EQ(CoordHelper::GetFixed(state.walls.front().coords.p1), wallFixedCoord);
     }
+    wallCreatePosLast = wallCreatePosNow;
     ++moveType;
     // Leave when walls maxed.
     if (wallIdx == (numWalls - 1))
@@ -456,22 +468,22 @@ TEST(evasion_core, CreateWall)
       TestWallCreate<State::Wall::Type_Vertical>(false);
     }
   }
-//  // Test alternating directions.
-//  {
-//    SCOPED_TRACE("Wall create - alternating starting with horizontal");
-//    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
-//    {
-//      TestWallCreate<State::Wall::Type_Horizontal>(true);
-//    }
-//  }
-//  // Test alternating directions.
-//  {
-//    SCOPED_TRACE("Wall create - alternating starting with vertical");
-//    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
-//    {
-//      TestWallCreate<State::Wall::Type_Vertical>(true);
-//    }
-//  }
+  // Test alternating directions.
+  {
+    SCOPED_TRACE("Wall create - alternating starting with horizontal");
+    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
+    {
+      TestWallCreate<State::Wall::Type_Horizontal>(true);
+    }
+  }
+  // Test alternating directions.
+  {
+    SCOPED_TRACE("Wall create - alternating starting with vertical");
+    for (int iteration = 0; iteration < CreateWallIterations; ++iteration)
+    {
+      TestWallCreate<State::Wall::Type_Vertical>(true);
+    }
+  }
 }
 
 }

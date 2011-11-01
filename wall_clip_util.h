@@ -76,12 +76,12 @@ State::Wall CreateClipped(const State::Position& pt,
         if (clip <= CoordHelp::GetClip(pt))
         {
           int& clipped = CoordHelp::GetClip(wallCoords.p0);
-          clipped = std::max(clip, clipped);
+          clipped = std::max(clip + 1, clipped);
         }
         else
         {
           int& clipped = CoordHelp::GetClip(wallCoords.p1);
-          clipped = std::min(clip, clipped);
+          clipped = std::min(clip - 1, clipped);
         }
     }
   }
