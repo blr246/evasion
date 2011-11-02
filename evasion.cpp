@@ -11,6 +11,15 @@ void WriteHunterMove(hps::Process* evasionClient,
 {
   // The format for the hunter move comes from evasion_game_server.py:
   //   r = re.compile('Remove:\[(.*)\] Build:(.*) Remove:\[(.*)\] Build:(.*)')
+    BasicHunter hunter;
+    State::Wall built;
+    std::vector<State::Wall> removed;
+    StepH stepH = hunter.Play(state, &built, &removed);
+    stepH.wallCreateFlag = StepH::WallCreate_None;
+    DoPly(stepH,state);
+    stepH.wallCreateFlag = StepH::WallCreate_None;
+    DoPly(stepH,state);
+    // we have the updated state and stepH and remove and build.
 }
 
 /// <sumamry> Write the Prey's move to the client. </summary>

@@ -1,6 +1,7 @@
 #ifndef _HPS_EVASION_HUNTER_
 #define _HPS_EVASION_HUNTER_
 #include "evasion_core.h"
+#include <limits>
 #include <set>
 #include <iostream>
 
@@ -15,6 +16,38 @@ struct Hunter{
 
 struct BasicHunter : public Hunter{
     BasicHunter(){};
+    
+    int FindMinHorizontalDistance(const std::vector<State::Wall>& walls, int y)
+    {
+        int idx = -1;
+        int minDistance = std::numeric_limits<int>::max();
+        for (int i = 0;i<walls.size();++i)
+        {
+            int distance = (walls.at(i).coords.p0.y - y);
+            if(minDistance > distance)
+            {
+                minDistance = distance;
+                idx = i;
+            }
+        }
+        return idx;
+    }
+    
+    int FindMinVerticalDistance(const std::vector<State::Wall>& walls, int x)
+    {
+        int minDistance = std::numeric_limits<int>::max();
+        int idx = -1;
+        for (int i = 0;i<walls.size();++i)
+        {
+            int distance = (walls.at(i).coords.p0.x - x);
+            if(minDistance > distance)
+            {
+                minDistance = distance;
+                idx = i;
+            }
+        }
+        return idx;
+    }
     
     StepH Play(State& game,State::Wall* built,std::vector<State::Wall>* removed)
     {
@@ -37,15 +70,25 @@ struct BasicHunter : public Hunter{
         int wallCreationAllowedIn = -1;
         bool wallCreationForbidden = WallCreationLockedOut(game, &wallCreationAllowedIn);
         // if wall creation is not fornbidden only then compute the direction of the wall to be created.
-        if( !wallCreationForbidden && IsPreyInRange(h.pos,pDestination)) // also add the distance limit, whenever within a particular range, only then draw the wall.
+        if( !wallCreationForbidden ) // also add the distance limit, whenever within a particular range, only then draw the wall.
         {
             ComputeWallDirection(h,pDestination,pSource,&move);
         }
         else
         {
             int idx = RandBound(game.walls.size());
-            State::Wall wall = game.walls.at(idx);
-            move.removeWalls.push_back(wall);
+            
+            /*std::vector<State::Wall> horizontalWalls;
+            std::vector<State::Wall> verticalWalls;
+            ExtractAllHorizontal(game.walls,&horizontalWalls);
+            ExtractAllVertical(game.walls,&verticalWalls);
+            int horzIdx = FindMinHorizontalDistance(horizontalWalls,pDestination.y);
+            int vertIdx = FindMinVerticalDistance(verticalWalls, pDestination.x);
+            State::Wall wall1 = game.walls.at(horzIdx);
+            State::Wall wall2 = game.walls.at(vertIdx);
+            move.removeWalls.push_back(wall1);
+            move.removeWalls.push_back(wall2);*/
+            move.removeWalls.push_back(game.walls.at(idx));
         }
         // make a move.
         DoPly(move, &game);
@@ -57,6 +100,33 @@ struct BasicHunter : public Hunter{
         *removed = move.removeWalls;
         return move;
     }
+    
+    void ExtractAllHorizontal(const std::vector<State::Wall> walls, std::vector<State::Wall>* horizontalWalls)
+    {
+        horizontalWalls->clear();
+        
+        for(int i=0;i<walls.size();++i)
+        {
+            if(walls.at(i).type == State::Wall::Type_Horizontal)
+            {
+                horizontalWalls->push_back(walls.at(i));
+            }
+        }
+    }
+    
+    
+    void ExtractAllVertical(const std::vector<State::Wall> walls, std::vector<State::Wall>* verticalWalls)
+    {
+        verticalWalls->clear();
+        for(int i=0;i<walls.size();++i)
+        {
+            if(walls.at(i).type == State::Wall::Type_Vertical)
+            {
+                verticalWalls->push_back(walls.at(i));
+            }
+        }
+    }
+    
     
     bool IsPreyInRange(const State::Position& hunterPos, const State::Position& preyPos)
     {
