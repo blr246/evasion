@@ -6,6 +6,8 @@
 #include <limits>
 #include <assert.h>
 #include <map>
+#include <sstream>
+#include <iostream>
 
 namespace hps
 {
@@ -137,6 +139,35 @@ struct StepH
   WallCreateFlag wallCreateFlag;
   /// <summary> Walls to remove. </summary>
   State::WallList removeWalls;
+
+  //Needs the POST-MOVE state
+  std::string Serialize(State& state){
+    std::stringstream ss;
+    ss << "Remove:[";
+    if(removeWalls.size() > 0)
+    {
+      for(int i = 0; i < removeWalls.size() - 1; i++)
+      {
+        ss << state.mapSimTimeToIdx[removeWalls[i].simTimeCreate] << ",";
+      }
+        ss << state.mapSimTimeToIdx[removeWalls[removeWalls.size()-1].simTimeCreate];
+    }
+    ss << "] Build:";
+
+    if(wallCreateFlag == WallCreate_Horizontal)
+    {
+      ss << "0 ";
+      ss << state.walls.back().coords.p0.x << " " << state.walls.back().coords.p1.x;
+      
+    }else if(wallCreateFlag == WallCreate_Vertical)
+    {
+      ss << "1 ";
+      ss << state.walls.back().coords.p0.y << " " << state.walls.back().coords.p1.y;
+    }
+
+    ss << " ";
+    return ss.str();
+  }
 };
 
 /// <summary> Data used for P to move one step. </summary>
@@ -145,6 +176,13 @@ struct StepP
   StepP() : moveDir(0, 0) {}
   /// <summary> Direction that P will move. </summary>
   State::Direction moveDir;
+  
+  std::string Serialize()
+  {
+    std::stringstream ss;
+    ss << moveDir.x << " " << moveDir.y;
+    return ss.str();
+  }
 };
 
 /// <summary> Bitwise or'd collection of error flags on DoPly(). </summary>

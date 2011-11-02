@@ -8,7 +8,7 @@
 namespace hunter_gtest
 {
   using namespace hps::evasion;
-  /*TEST(BasicHunter, Play)
+  TEST(BasicHunter, Play)
   {
     State state;
     Initialize(3, 3, &state);
@@ -24,11 +24,11 @@ namespace hunter_gtest
     ASSERT_TRUE(state.walls.size() == 0);
     ASSERT_TRUE(state.simTime == 0);
 
-    h.Play(state);
+    //DoPly(state, h.Play(state));
     ASSERT_TRUE(state.walls.size() == 0);
     ASSERT_TRUE(state.simTime == 2);
 
 
-  }*/
+  }
 }
 #endif //_HPS_EVASION_HUNTER_GTEST_

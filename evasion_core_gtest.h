@@ -93,6 +93,16 @@ TEST(evasion_core, ReadState)
     State state;
     EXPECT_TRUE(ParseStateString(std::string(stateStr), 3, 4, &state));
   }
+  // Walls: [wall_index (x0, y0, x1, y1), wall_index (x0, y0, x1, y1), ...]
+  {
+    const char stateStr[] = "You are Prey\n"
+                            "Hunter:0 0 1 1\n"
+                            "Prey:  330 200\n"
+                            "Walls: [0 (0, 0, 0, 499), 1 (1, 4, 499, 4)]\n"
+                            "\n";
+    State state;
+    EXPECT_TRUE(ParseStateString(std::string(stateStr), 3, 4, &state));
+  }
 }
 
 /// <summary> Test motion interaction with a single wall. </summary>
@@ -643,6 +653,28 @@ TEST(evasion_core, RemoveWalls)
   }
 }
 
+TEST(SerializeStep, StepH)
+{
+  State state;
+  Initialize(3, 3, &state);
+  StepH step;
+  std::string s = step.Serialize(state);
+  EXPECT_EQ("Remove:[] Build: ", s);
+}
+
+TEST(SerializeStep, StepP)
+{
+  StepP step;
+  std::string s = step.Serialize();
+  step.moveDir.x = 0;
+  step.moveDir.y = 0;
+  EXPECT_EQ(s, "0 0");
+
+  step.moveDir.x = 1;
+  step.moveDir.y = -1;
+  s = step.Serialize();
+  EXPECT_EQ(s, "1 -1");
+}
 }
 
 #endif //_HPS_EVASION_EVASION_CORE_GTEST_H_

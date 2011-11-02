@@ -202,7 +202,7 @@ TEST(BasicHunter, Play)
     Process vis;
     InitializeVis(state, &vis);
     
-    enum { MaxIterations = 10000, };
+    enum { MaxIterations = 100, };
     enum { MoveType_H = 2, };
     int moveType = MoveType_H;
     // We will limit iterations here for demo purposes.
@@ -212,7 +212,7 @@ TEST(BasicHunter, Play)
         State::Wall built;
         std::vector<State::Wall> removed;
         std::cout << "calling Play..." <<std::endl;
-        StepH stepH = hunter.Play(state, &built, &removed);
+        StepH stepH = hunter.Play(&state, &built, &removed);
         stepH.wallCreateFlag = StepH::WallCreate_None;
         DoPly(stepH, &state);
         StepP stepP = prey.NextStep(state);

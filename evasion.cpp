@@ -1,30 +1,36 @@
 #include "evasion_core.h"
+#include "prey.h"
+#include "hunter.h"
 #include "process.h"
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <algorithm>
 
+using namespace hps;
 /// <summary> Write the Hunter's move to the client. </summary>
 void WriteHunterMove(hps::Process* evasionClient,
-                     const hps::StepH& first, const hps::StepH& second)
+                     BasicHunter h,
+                     State *state)
 {
   // The format for the hunter move comes from evasion_game_server.py:
   //   r = re.compile('Remove:\[(.*)\] Build:(.*) Remove:\[(.*)\] Build:(.*)')
-    BasicHunter hunter;
-    State::Wall built;
-    std::vector<State::Wall> removed;
-    StepH stepH = hunter.Play(state, &built, &removed);
-    stepH.wallCreateFlag = StepH::WallCreate_None;
-    DoPly(stepH,state);
-    stepH.wallCreateFlag = StepH::WallCreate_None;
-    DoPly(stepH,state);
-    // we have the updated state and stepH and remove and build.
+  State::Wall built;
+  std::vector<State::Wall> removed;
+  StepH first = h.Play(state,&built,&removed);
+  DoPly(first, state);
+  evasionClient->WriteStdin(first.Serialize(*state));
+  StepH second = h.Play(state,&built,&removed);
+  DoPly(second, state);
+  evasionClient->WriteStdin(second.Serialize(*state));
+  evasionClient->WriteStdin("\n");
 }
 
 /// <sumamry> Write the Prey's move to the client. </summary>
-void WritePreyMove(hps::Process* evasionClient, const hps::StepP& stepP)
+void WritePreyMove(hps::Process* evasionClient, hps::StepP& stepP)
 {
+  evasionClient->WriteStdin(stepP.Serialize());
+  evasionClient->WriteStdin("\n");
 }
 
 /// <summary> Read the Hunter's move from the server. </summary>
@@ -133,6 +139,17 @@ int main(int argc, char** argv)
   while (ReadState(&evasionClient, args.m, args.n, &state))
   {
     // Play the game!
+    bool isPrey;
+    std::string s;
+    if(isPrey){
+      ExtremePrey p;
+      StepP step = p.NextStep(state);
+      WritePreyMove(&evasionClient, step);
+    }else{
+      BasicHunter h;
+      WriteHunterMove(&evasionClient, h, &state);
+    }
+  
   }
 
   return 0;

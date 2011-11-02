@@ -11,7 +11,7 @@ namespace evasion
 {
 enum Directions{North,East,West,South,NorthEast,NorthWest,SouthEast,SouthWest,Still,};
 struct Hunter{
-    virtual StepH Play(State& game,State::Wall* built,std::vector<State::Wall>* removed) = 0;
+    virtual StepH Play(State* game,State::Wall* built,std::vector<State::Wall>* removed) = 0;
 };
 
 struct BasicHunter : public Hunter{
@@ -49,7 +49,7 @@ struct BasicHunter : public Hunter{
         return idx;
     }
     
-    StepH Play(State& game,State::Wall* built,std::vector<State::Wall>* removed)
+    StepH Play(State* game,State::Wall* built,std::vector<State::Wall>* removed)
     {
         removed->clear();
         std::cout << "inside Play..." << std::endl;
@@ -59,16 +59,16 @@ struct BasicHunter : public Hunter{
         // if we can.
         
         
-        State::HunterMotionInfo h = game.motionH;
+        State::HunterMotionInfo h = game->motionH;
         
         StepH move;
         move.wallCreateFlag = StepH::WallCreate_None;
-        const State::Position& pDestination = game.posStackP.back();
-        const State::Position& pSource = game.posStackP.at(game.posStackP.size()-1);
+        const State::Position& pDestination = game->posStackP.back();
+        const State::Position& pSource = game->posStackP.at(game->posStackP.size()-1);
         
         
         int wallCreationAllowedIn = -1;
-        bool wallCreationForbidden = WallCreationLockedOut(game, &wallCreationAllowedIn);
+        bool wallCreationForbidden = WallCreationLockedOut(*game, &wallCreationAllowedIn);
         // if wall creation is not fornbidden only then compute the direction of the wall to be created.
         if( !wallCreationForbidden ) // also add the distance limit, whenever within a particular range, only then draw the wall.
         {
@@ -76,7 +76,7 @@ struct BasicHunter : public Hunter{
         }
         else
         {
-            int idx = RandBound(game.walls.size());
+            int idx = RandBound(game->walls.size());
             
             /*std::vector<State::Wall> horizontalWalls;
             std::vector<State::Wall> verticalWalls;
@@ -88,12 +88,12 @@ struct BasicHunter : public Hunter{
             State::Wall wall2 = game.walls.at(vertIdx);
             move.removeWalls.push_back(wall1);
             move.removeWalls.push_back(wall2);*/
-            move.removeWalls.push_back(game.walls.at(idx));
+            move.removeWalls.push_back(game->walls.at(idx));
         }
         // make a move.
-        DoPly(move, &game);
-        State::Wall justCreatedWall = game.walls.front();
-        if(justCreatedWall.simTimeCreate == game.simTime -1)
+        DoPly(move, game);
+        State::Wall justCreatedWall = game->walls.front();
+        if(justCreatedWall.simTimeCreate == game->simTime -1)
         {
             *built = justCreatedWall;
         }
@@ -135,7 +135,7 @@ struct BasicHunter : public Hunter{
         int y = hunterPos.y - preyPos.y;
         std::cout << "x: " <<x << ", y: " << y << std::endl;
         float max_distance = 10.0f;
-        float dist = std::sqrt(x*x + y*y);
+        float dist = sqrt(x*x + y*y);
         std::cout << "max: " << max_distance << std::endl;
         std::cout << "dist: "<< dist << std::endl;
         if (max_distance < dist)
