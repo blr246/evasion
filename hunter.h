@@ -76,6 +76,9 @@ struct BasicHunter : public Hunter{
         }
         else
         {
+            //Need to implement the function that finds the wall to be removed.
+            //It doesn't quite work as expected, it's a stupid hunter.
+            
             int idx = RandBound(game->walls.size());
             
             /*std::vector<State::Wall> horizontalWalls;
