@@ -11,6 +11,9 @@ void WriteHunterMove(hps::Process* evasionClient,
 {
   // The format for the hunter move comes from evasion_game_server.py:
   //   r = re.compile('Remove:\[(.*)\] Build:(.*) Remove:\[(.*)\] Build:(.*)')
+  evasionClient->WriteStdin(first.Serialize());
+  evasionClient->WriteStdin(second.Serialize());
+  evasionClient->WriteStdin("\n");
 }
 
 /// <sumamry> Write the Prey's move to the client. </summary>
