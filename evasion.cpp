@@ -1,18 +1,26 @@
 #include "evasion_core.h"
+#include "prey.h"
+#include "hunter.h"
 #include "process.h"
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <algorithm>
 
+using namespace hps;
 /// <summary> Write the Hunter's move to the client. </summary>
 void WriteHunterMove(hps::Process* evasionClient,
-                     const hps::StepH& first, const hps::StepH& second)
+                     BasicHunter h,
+                     State *state)
 {
   // The format for the hunter move comes from evasion_game_server.py:
   //   r = re.compile('Remove:\[(.*)\] Build:(.*) Remove:\[(.*)\] Build:(.*)')
-  evasionClient->WriteStdin(first.Serialize());
-  evasionClient->WriteStdin(second.Serialize());
+  StepH first = h.Play(state);
+  DoPly(first, state);
+  evasionClient->WriteStdin(first.Serialize(state));
+  StepH second = h.Play(state);
+  DoPly(second, state);
+  evasionClient->WriteStdin(second.Serialize(state));
   evasionClient->WriteStdin("\n");
 }
 
@@ -129,6 +137,17 @@ int main(int argc, char** argv)
   while (ReadState(&evasionClient, args.m, args.n, &state))
   {
     // Play the game!
+    bool isPrey;
+    std::string s;
+    if(isPrey){
+      ExtremePrey p;
+      StepP step = p.NextStep(state);
+      WritePreyMove(&evasionClient, step);
+    }else{
+      BasicHunter h;
+      WriteHunterMove(&evasionClient, h, &state);
+    }
+  
   }
 
   return 0;

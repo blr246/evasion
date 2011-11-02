@@ -65,7 +65,7 @@ struct BasicHunter : public Hunter{
         int y = hunterPos.y - preyPos.y;
         std::cout << "x: " <<x << ", y: " << y << std::endl;
         float max_distance = 10.0f;
-        float dist = std::sqrt(x*x + y*y);
+        float dist = sqrt(x*x + y*y);
         std::cout << "max: " << max_distance << std::endl;
         std::cout << "dist: "<< dist << std::endl;
         if (max_distance < dist)
