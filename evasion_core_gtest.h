@@ -659,7 +659,7 @@ TEST(SerializeStep, StepH)
   Initialize(3, 3, &state);
   StepH step;
   std::string s = step.Serialize(state);
-  EXPECT_EQ("Remove:[] Build:", s);
+  EXPECT_EQ("Remove:[] Build: ", s);
 }
 
 TEST(SerializeStep, StepP)

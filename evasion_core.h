@@ -144,13 +144,14 @@ struct StepH
   std::string Serialize(State& state){
     std::stringstream ss;
     ss << "Remove:[";
-    for(int i = 0; i < removeWalls.size() - 1; i++)
-    {
-      ss << state.mapSimTimeToIdx[removeWalls[i].simTimeCreate] << ",";
-    }
     if(removeWalls.size() > 0)
-      ss << state.mapSimTimeToIdx[removeWalls[removeWalls.size()-1].simTimeCreate];
-
+    {
+      for(int i = 0; i < removeWalls.size() - 1; i++)
+      {
+        ss << state.mapSimTimeToIdx[removeWalls[i].simTimeCreate] << ",";
+      }
+        ss << state.mapSimTimeToIdx[removeWalls[removeWalls.size()-1].simTimeCreate];
+    }
     ss << "] Build:";
 
     if(wallCreateFlag == WallCreate_Horizontal)
