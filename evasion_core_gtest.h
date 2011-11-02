@@ -655,8 +655,10 @@ TEST(evasion_core, RemoveWalls)
 
 TEST(SerializeStep, StepH)
 {
+  State state;
+  Initialize(3, 3, &state);
   StepH step;
-  std::string s = step.Serialize();
+  std::string s = step.Serialize(state);
   EXPECT_EQ("Remove:[] Build:", s);
 }
 

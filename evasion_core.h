@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <map>
 #include <sstream>
+#include <iostream>
 
 namespace hps
 {
@@ -139,8 +140,31 @@ struct StepH
   /// <summary> Walls to remove. </summary>
   State::WallList removeWalls;
 
-  std::string Serialize(){
+  //Needs the POST-MOVE state
+  std::string Serialize(State& state){
     std::stringstream ss;
+    ss << "Remove:[";
+    for(int i = 0; i < removeWalls.size() - 1; i++)
+    {
+      ss << state.mapSimTimeToIdx[removeWalls[i].simTimeCreate] << ",";
+    }
+    if(removeWalls.size() > 0)
+      ss << state.mapSimTimeToIdx[removeWalls[removeWalls.size()-1].simTimeCreate];
+
+    ss << "] Build:";
+
+    if(wallCreateFlag == WallCreate_Horizontal)
+    {
+      ss << "0 ";
+      ss << state.walls.back().coords.p0.x << " " << state.walls.back().coords.p1.x;
+      
+    }else if(wallCreateFlag == WallCreate_Vertical)
+    {
+      ss << "1 ";
+      ss << state.walls.back().coords.p0.y << " " << state.walls.back().coords.p1.y;
+    }
+
+    ss << " ";
     return ss.str();
   }
 };

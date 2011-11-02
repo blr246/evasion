@@ -202,7 +202,7 @@ TEST(BasicHunter, Play)
     Process vis;
     InitializeVis(state, &vis);
     
-    enum { MaxIterations = 10000, };
+    enum { MaxIterations = 100, };
     enum { MoveType_H = 2, };
     int moveType = MoveType_H;
     // We will limit iterations here for demo purposes.
