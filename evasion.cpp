@@ -19,6 +19,8 @@ void WriteHunterMove(hps::Process* evasionClient,
 /// <sumamry> Write the Prey's move to the client. </summary>
 void WritePreyMove(hps::Process* evasionClient, const hps::StepP& stepP)
 {
+  evasionClient->WriteStdin(stepP.Serialize());
+  evasionClient->WriteStdin("\n");
 }
 
 /// <summary> Read the Hunter's move from the server. </summary>
